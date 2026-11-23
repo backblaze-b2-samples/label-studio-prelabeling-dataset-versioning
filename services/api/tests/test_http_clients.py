@@ -30,7 +30,7 @@ def test_token_header_and_project_payload():
 
 
 def test_storage_payloads_point_at_b2(monkeypatch):
-    monkeypatch.setattr(settings, "b2_region", "us-west-004")
+    monkeypatch.setattr(settings, "b2_region", "test-region-1")
     monkeypatch.setattr(settings, "b2_bucket_name", "bkt")
     bodies = []
 
@@ -43,8 +43,8 @@ def test_storage_payloads_point_at_b2(monkeypatch):
     client.create_export_storage(1, "labeling/annotations/p/")
     (imp_path, imp), (exp_path, exp) = bodies
     assert imp_path == "/api/storages/s3/" and exp_path == "/api/storages/export/s3"
-    assert imp["s3_endpoint"] == "https://s3.us-west-004.backblazeb2.com"
-    assert imp["region_name"] == "us-west-004" and imp["bucket"] == "bkt"
+    assert imp["s3_endpoint"] == "https://s3.test-region-1.backblazeb2.com"
+    assert imp["region_name"] == "test-region-1" and imp["bucket"] == "bkt"
     assert imp["prefix"] == "labeling/raw/p"  # no trailing slash: LS joins with "/"
     assert exp["prefix"] == "labeling/annotations/p"
     assert imp["use_blob_urls"] and imp["presign"] and imp["recursive_scan"]
