@@ -1,7 +1,5 @@
 import logging
 import re
-from collections import defaultdict
-from datetime import UTC, datetime, timedelta
 
 from app.config import settings
 from app.repo import (
@@ -18,7 +16,6 @@ from app.repo import (
 from app.service.metadata import extract_metadata
 from app.types import FileMetadata, FileMetadataDetail, UploadStats
 from app.types.formatting import humanize_bytes
-from app.types.stats import DailyUploadCount
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +63,7 @@ def validate_key(key: str) -> None:
     `settings.allowed_key_prefix` is empty by default, so any key shape is
     accepted (the by-key routes deliberately support arbitrary folders and
     reserved-word segments). Set it to confine key ops to a prefix like
-    "uploads/" when the bucket also holds non-app data.
+    "labeling/" when the bucket also holds non-app data.
     """
     if not key:
         raise FileKeyError()
@@ -179,25 +176,3 @@ def remove_file(key: str) -> None:
     """Validate key and delete the file. Raises RuntimeError on B2 failure."""
     validate_key(key)
     delete_file(key)
-
-
-def get_upload_activity(days: int = 7) -> list[DailyUploadCount]:
-    """Return daily upload counts for the last N days."""
-    files = list_files(prefix="")
-    today = datetime.now(UTC).date()
-    cutoff = today - timedelta(days=days - 1)
-
-    counts: dict[str, int] = defaultdict(int)
-    for f in files:
-        d = f.uploaded_at.date()
-        if d >= cutoff:
-            counts[d.isoformat()] += 1
-
-    # Fill in missing days with zero
-    return [
-        DailyUploadCount(
-            date=(cutoff + timedelta(days=i)).isoformat(),
-            uploads=counts.get((cutoff + timedelta(days=i)).isoformat(), 0),
-        )
-        for i in range(days)
-    ]

@@ -250,16 +250,16 @@ describe("uploadFile — direct-to-B2 PUT failure", () => {
   it("blames bucket CORS, not the API", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
-        headers: { "Content-Type": "text/plain" },
-        key: "uploads/note.txt",
+        headers: { "Content-Type": "image/jpeg" },
+        key: "labeling/raw/street/photo.jpg",
         method: "put",
-        url: "https://s3.example.backblazeb2.com/bucket/uploads/note.txt",
+        url: "https://s3.example.backblazeb2.com/bucket/labeling/raw/street/photo.jpg",
       })
     );
 
-    const file = new File(["hi"], "note.txt", { type: "text/plain" });
+    const file = new File(["hi"], "photo.jpg", { type: "image/jpeg" });
 
-    const error = await uploadFile(file).catch((e: unknown) => e);
+    const error = await uploadFile(file, "street").catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(0);

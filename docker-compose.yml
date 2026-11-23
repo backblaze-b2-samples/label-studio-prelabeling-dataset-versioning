@@ -1,0 +1,63 @@
+# Label Studio Community Edition + the sample's ML backend, local only.
+#
+#   docker compose up -d        (reads the repo-root .env for interpolation)
+#
+# Both ports bind to 127.0.0.1: Label Studio stores the B2 key you give it in
+# its database volume, so it must never be reachable from other machines.
+name: label-studio-prelabeling-dataset-versioning
+
+services:
+  label-studio:
+    # Pinned release (no `latest`). Verified against 1.23.2's source: storage
+    # API shapes, target-storage object naming and the bootstrap token flow.
+    image: heartexlabs/label-studio:1.23.2
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      # Bootstrap admin, created on first start. The token is the legacy API
+      # token this sample's API sends as `Authorization: Token <token>`;
+      # `pnpm run setup` generates it into .env as LABEL_STUDIO_API_TOKEN.
+      LABEL_STUDIO_USERNAME: ${LABEL_STUDIO_USERNAME:-admin@example.com}
+      LABEL_STUDIO_PASSWORD: ${LABEL_STUDIO_PASSWORD:?run pnpm run setup to generate LABEL_STUDIO_PASSWORD in .env}
+      LABEL_STUDIO_USER_TOKEN: ${LABEL_STUDIO_API_TOKEN:?run pnpm run setup to generate LABEL_STUDIO_API_TOKEN in .env}
+      # Label Studio 1.23 turns legacy tokens off for new organizations; this
+      # is the supported switch that keeps the bootstrap token valid.
+      LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN: "true"
+      LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+      # The ML backend lives on the compose network (a private address), which
+      # Label Studio's SSRF guard blocks for ML URLs unless this is off. B2's
+      # public S3 endpoint is unaffected: storage SSRF protection stays on.
+      ML_BLOCK_LOCAL_IP: "false"
+      # botocore appends this to the User-Agent of Label Studio's own S3
+      # client (app/<id>), so its B2 traffic carries the sample attribution
+      # without patching Label Studio.
+      AWS_SDK_UA_APP_ID: b2ai-label-studio-annotation-loop
+    volumes:
+      - label-studio-data:/label-studio/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 18
+    restart: unless-stopped
+
+  ml-backend:
+    build: ./services/ml-backend
+    image: label-studio-prelabeling-dataset-versioning-ml-backend
+    ports:
+      - "127.0.0.1:9090:9090"
+    environment:
+      # Read-only use: the backend reads task images from B2 by s3:// URI.
+      B2_APPLICATION_KEY_ID: ${B2_APPLICATION_KEY_ID:?set B2_APPLICATION_KEY_ID in .env}
+      B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:?set B2_APPLICATION_KEY in .env}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME:?set B2_BUCKET_NAME in .env}
+      B2_REGION: ${B2_REGION:?set B2_REGION in .env}
+      PRELOAD_MODEL: "true"
+    volumes:
+      - model-cache:/home/app/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  label-studio-data:
+  model-cache:

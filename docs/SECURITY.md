@@ -1,17 +1,29 @@
-<!-- last_verified: 2026-07-30 -->
+<!-- last_verified: 2026-11-23 -->
 # Security
 
-Security principles and implementation for the vibe-coding-starter-kit.
+Security principles and implementation for the label-studio-prelabeling-dataset-versioning.
 
 ## Trust Boundaries
 
-- **Frontend -> API**: CORS-restricted to configured origins, scoped to `GET/POST/DELETE/OPTIONS`. `allow_credentials` is `False` (no cookie/session auth today); enable it only alongside real auth and a tightened origin allowlist.
+- **Frontend -> API**: CORS-restricted to configured origins, scoped to `GET/POST/PATCH/DELETE/OPTIONS`. `allow_credentials` is `False` (no cookie/session auth today); enable it only alongside real auth and a tightened origin allowlist.
 - **API -> B2**: Authenticated via `B2_APPLICATION_KEY_ID` + `B2_APPLICATION_KEY`, signature v4
+- **API -> Label Studio**: `Authorization: Token <LABEL_STUDIO_API_TOKEN>`, the bootstrap admin's token (see [Label Studio](#label-studio))
+- **Label Studio -> B2**: Label Studio's own S3 client with the key the API configured on its storages (S3 API, signature v4)
+- **ML backend -> B2**: read-only use of the same key, to fetch task images by `s3://` URI
 - **Client -> B2**: Presigned URLs for download (10-min expiry, `Content-Disposition: attachment`) and for direct upload (short-lived PUT with the size and content-type signed in, so B2 rejects a mismatched body)
+
+## Label Studio
+
+- **It holds your B2 key.** Creating a project hands Label Studio the B2 key ID and application key for its source and target storages, and Label Studio stores them in its database inside the `label-studio-data` Docker volume. Use an application key restricted to a dedicated test bucket (or the `labeling/` prefix), with no more capability than read, write and list; `docker compose down -v` removes the volume and the stored key.
+- **Localhost only.** Both compose ports bind to `127.0.0.1`. Do not expose Label Studio or the ML backend beyond your machine; hosting Label Studio publicly is out of scope for this sample.
+- **Bootstrap credentials are generated, never typed.** `pnpm run setup` writes a random `LABEL_STUDIO_API_TOKEN` and `LABEL_STUDIO_PASSWORD` into `.env` (mode 600) without printing them; self sign-up is disabled (`LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=true`).
+- **Legacy token on purpose.** `LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN=true` keeps the bootstrap token valid on 1.23; it is a long-lived bearer token, so treat it like the B2 key.
+- **SSRF settings.** `ML_BLOCK_LOCAL_IP=false` only relaxes the ML-backend URL check (the backend sits on the private compose network). Label Studio's storage SSRF protection stays on; B2's endpoint is public.
+- **Presigned image URLs** for the labeling UI expire after 15 minutes; the bucket CORS rule for the Label Studio origin allows GET/HEAD only.
 
 ## Authentication & Multi-Tenancy
 
-- **No auth by design.** The file API (`/files`, `/files-by-key`, `/upload/presign`, `/upload/verify`) is unauthenticated and bucket-wide — any client can list, download, delete, and (via presign) upload objects. Acceptable for a single-tenant demo; the rate limiter guards the open endpoints.
+- **No auth by design.** The API (`/files`, `/files-by-key`, `/upload/*`, `/projects/*`) is unauthenticated and bucket-wide — any client that reaches it can list, download, delete, upload, create or delete projects (including `purge_b2=true`). Acceptable for a single-tenant demo; the rate limiter guards the open endpoints.
 - **Adding auth to a clone does not close this automatically.** A login screen alone leaves an open, cross-user file API. You must both (1) require auth on every file route and (2) scope listings and reads to the caller's own prefixes — skipping either lets one signed-in user read and delete another's files. See the co-located notes in `runtime/files.py` and `service/files.py`.
 
 ## Upload Validation
@@ -19,11 +31,11 @@ Security principles and implementation for the vibe-coding-starter-kit.
 Uploads go directly from the browser to B2, so the API validates at two points:
 `/upload/presign` (before any bytes) and `/upload/verify` (after the PUT).
 
-- Filename sanitization: path traversal, null bytes, unsafe chars stripped; the API mints the object key (`uploads/{sanitised}`), so the client never chooses it
+- Filename sanitization: path traversal, null bytes, unsafe chars stripped; the API mints the object key (`labeling/raw/{project}/{sanitised}`), so the client never chooses it; the project slug is validated and must exist
 - MIME/extension consistency check against the allowlist (at presign)
 - Size enforcement: the declared size is signed into the presigned PUT as `Content-Length`, so B2 rejects a body of any other size with `403`; the API refuses to presign a size above the 100MB default
-- Content-type allowlist (images, PDFs, text, archives, audio/video), also signed into the PUT. **SVG is excluded** — it can embed `<script>` that executes when served from a public bucket URL (stored XSS). Re-add only with server-side sanitization.
-- **Magic-byte signature check** (at verify): a `Range` GET fetches the leading bytes and confirms they match the declared type, so a script payload can't masquerade as `image/png`; a mismatch deletes the object. Text-like types (plain/CSV/JSON) have no signature and skip this check.
+- Content-type allowlist: `image/jpeg`, `image/png`, `image/webp` only (what Label Studio imports), also signed into the PUT. **SVG is excluded** — it can embed `<script>` that executes when served from a public bucket URL (stored XSS). Re-add only with server-side sanitization.
+- **Magic-byte signature check** (at verify): a `Range` GET fetches the leading bytes and confirms they match the declared type, so a script payload can't masquerade as `image/png`; a mismatch deletes the object.
 - Empty file rejection (at presign)
 - The `/upload/presign` endpoint hands out short-lived, single-key, size- and type-bound B2 write URLs. Like the rest of the API it is unauthenticated, and it is guarded by the write rate limiter.
 
@@ -75,13 +87,13 @@ Uploads go directly from the browser to B2, so the API validates at two points:
 
 ## Deployment Configuration
 
-The [Railway](../infra/railway/README.md) and
-[Vercel](../infra/vercel/README.md) delivery contracts are the canonical
-locations for production variable classification and environment access rules.
-In particular, `B2_APPLICATION_KEY_ID` and `B2_APPLICATION_KEY` are secrets; the web
-service's `NEXT_PUBLIC_API_URL` is intentionally public build-time
-configuration and must never contain a credential. Keep production variables,
-logs, and metrics restricted to authorized operators.
+This sample runs locally and ships no deployment target. The kit's
+[Railway](../infra/railway/README.md) and [Vercel](../infra/vercel/README.md)
+runbooks remain for reference only: Label Studio must run beside the app and
+stores the B2 key, so a hosted deployment needs its own security review.
+`B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `LABEL_STUDIO_API_TOKEN` and
+`LABEL_STUDIO_PASSWORD` are secrets; `NEXT_PUBLIC_API_URL` is public build-time
+configuration and must never contain a credential.
 
 ## Agent Security Rules
 

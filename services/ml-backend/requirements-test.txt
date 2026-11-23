@@ -1,0 +1,7 @@
+# Unit tests for the HTTP layer use a stub detector, so they need no torch.
+fastapi==0.165.0
+pillow==13.0.0
+boto3==1.44.10
+httpx==0.28.1
+pytest==9.2.0
+ruff==0.17.4

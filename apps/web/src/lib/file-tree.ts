@@ -1,4 +1,4 @@
-import type { FileMetadata } from "@vibe-coding-starter-kit/shared";
+import type { FileMetadata } from "@label-studio-prelabeling-dataset-versioning/shared";
 
 export interface TreeFolder {
   type: "folder";

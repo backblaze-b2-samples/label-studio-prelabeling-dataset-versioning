@@ -1,14 +1,28 @@
 import type {
-  DailyUploadCount,
+  AnnotationSyncResult,
+  AssetPage,
+  DatasetRelease,
   DeleteFileResponse,
   FileMetadata,
   FileMetadataDetail,
   FileUploadResponse,
   FileUrlResponse,
+  FlaggedTask,
   HealthStatus,
+  LabelingProject,
+  ModelInfo,
+  PrelabelRun,
+  PrelabelRunCreate,
   PresignUploadResponse,
+  ProjectCreate,
+  ProjectDeleted,
+  ProjectDetail,
+  ProjectUpdate,
+  ReleaseCreate,
+  SyncResult,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+  VerificationReport,
+} from "@label-studio-prelabeling-dataset-versioning/shared";
 
 import { API_CLIENT_ROUTES } from "./generated/api-routes";
 
@@ -38,6 +52,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    /** Tasks that block a release (409 `ReleaseBlocked` bodies only). */
+    public readonly flagged: FlaggedTask[] = [],
   ) {
     super(message);
     this.name = "ApiError";
@@ -114,11 +130,39 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(
-      body.detail || `API error: ${res.status}`,
+      typeof body.detail === "string" ? body.detail : `API error: ${res.status}`,
       res.status,
+      Array.isArray(body.flagged) ? body.flagged : [],
     );
   }
   return res.json();
+}
+
+/** Fill `{slug}`-style path parameters from the generated route registry. */
+export function routePath(
+  path: string,
+  params: Record<string, string>,
+  query?: Record<string, string | undefined>,
+): string {
+  const filled = path.replace(/\{(\w+)\}/g, (_match, name: string) => {
+    const value = params[name];
+    if (!value) throw new ApiError(`Missing route parameter: ${name}`, 400);
+    return encodeURIComponent(value);
+  });
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined && value !== "") search.set(key, value);
+  }
+  const qs = search.toString();
+  return qs ? `${filled}?${qs}` : filled;
+}
+
+function jsonInit(method: string, body?: unknown): RequestInit {
+  return {
+    method: method.toUpperCase(),
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  };
 }
 
 function isEndpointUnavailable(error: unknown): error is ApiError {
@@ -202,12 +246,6 @@ export async function getFileStats() {
   return apiFetch<UploadStats>(API_CLIENT_ROUTES.fileStats.path);
 }
 
-export async function getUploadActivity(days = 7) {
-  return apiFetch<DailyUploadCount[]>(
-    `${API_CLIENT_ROUTES.uploadActivity.path}?days=${days}`
-  );
-}
-
 export async function getFile(key: string) {
   return apiFetchWithLegacyFallback<FileMetadata>(
     `${API_CLIENT_ROUTES.fileByKeyMetadata.path}?${fileKeyQuery(key)}`,
@@ -259,18 +297,18 @@ export async function deleteFile(key: string) {
 }
 
 /**
- * Upload a file directly to B2 in three steps: presign (the API validates the
- * declared file and signs a short-lived PUT), a direct browser→B2 PUT, then
- * verify (the API inspects the stored object). The bytes never pass through the
- * API, which is what removes Vercel's ~4.5 MB Function payload ceiling.
+ * Upload a raw image directly to B2 in three steps: presign (the API validates
+ * the declared file and signs a short-lived PUT into
+ * `labeling/raw/<project>/`), a direct browser→B2 PUT, then verify (the API
+ * inspects the stored object). The bytes never pass through the API.
  *
- * The `(file, onProgress) => FileUploadResponse` signature is unchanged, so the
- * upload queue and progress UI don't care that the transport changed. Progress
+ * Progress
  * tracks the browser→B2 leg; when it reaches 100% the queue enters its
  * server-side phase (see `upload-status`) while `verify` runs.
  */
 export async function uploadFile(
   file: File,
+  project: string,
   onProgress?: (percent: number) => void
 ): Promise<FileUploadResponse> {
   const presign = await apiFetch<PresignUploadResponse>(
@@ -279,6 +317,7 @@ export async function uploadFile(
       method: API_CLIENT_ROUTES.uploadPresign.method.toUpperCase(),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        project,
         filename: file.name,
         content_type: file.type,
         size_bytes: file.size,
@@ -339,3 +378,79 @@ function putFileToStorage(
     xhr.send(file);
   });
 }
+
+// --- labeling projects -------------------------------------------------------
+
+const R = API_CLIENT_ROUTES;
+
+export const getModels = () => apiFetch<ModelInfo>(R.models.path);
+
+export const getProjects = () => apiFetch<LabelingProject[]>(R.projects.path);
+
+export const createProject = (body: ProjectCreate) =>
+  apiFetch<LabelingProject>(R.projectCreate.path, jsonInit(R.projectCreate.method, body));
+
+export const getProject = (slug: string) =>
+  apiFetch<ProjectDetail>(routePath(R.project.path, { slug }));
+
+export const updateProject = (slug: string, body: ProjectUpdate) =>
+  apiFetch<LabelingProject>(
+    routePath(R.projectUpdate.path, { slug }),
+    jsonInit(R.projectUpdate.method, body),
+  );
+
+export const deleteProject = (slug: string, purgeB2: boolean) =>
+  apiFetch<ProjectDeleted>(
+    routePath(R.projectDelete.path, { slug }, { purge_b2: String(purgeB2) }),
+    jsonInit(R.projectDelete.method),
+  );
+
+export const syncProject = (slug: string) =>
+  apiFetch<SyncResult>(routePath(R.projectSync.path, { slug }), jsonInit(R.projectSync.method));
+
+export const getPrelabelRuns = (slug: string) =>
+  apiFetch<PrelabelRun[]>(routePath(R.prelabelRuns.path, { slug }));
+
+export const createPrelabelRun = (slug: string, body: PrelabelRunCreate) =>
+  apiFetch<PrelabelRun>(
+    routePath(R.prelabelRunCreate.path, { slug }),
+    jsonInit(R.prelabelRunCreate.method, body),
+  );
+
+export const syncAnnotations = (slug: string) =>
+  apiFetch<AnnotationSyncResult>(
+    routePath(R.annotationsSync.path, { slug }),
+    jsonInit(R.annotationsSync.method),
+  );
+
+export const getVerification = (slug: string) =>
+  apiFetch<VerificationReport>(routePath(R.verification.path, { slug }));
+
+export const getReleases = (slug: string) =>
+  apiFetch<DatasetRelease[]>(routePath(R.releases.path, { slug }));
+
+export const createRelease = (slug: string, body: ReleaseCreate) =>
+  apiFetch<DatasetRelease>(
+    routePath(R.releaseCreate.path, { slug }),
+    jsonInit(R.releaseCreate.method, body),
+  );
+
+export const getRelease = (slug: string, release: string) =>
+  apiFetch<DatasetRelease>(routePath(R.release.path, { slug, release }));
+
+export const verifyRelease = (slug: string, release: string) =>
+  apiFetch<VerificationReport>(
+    routePath(R.releaseVerify.path, { slug, release }),
+    jsonInit(R.releaseVerify.method),
+  );
+
+export type AssetKind = "raw" | "prelabels" | "annotations" | "exports";
+
+export const getAssets = (
+  slug: string,
+  kind: AssetKind,
+  options: { run?: string; release?: string; cursor?: string } = {},
+) =>
+  apiFetch<AssetPage>(
+    routePath(R.assets.path, { slug }, { kind, ...options }),
+  );

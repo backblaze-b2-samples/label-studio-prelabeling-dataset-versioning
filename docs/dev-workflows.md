@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-09-09 -->
+<!-- last_verified: 2026-11-23 -->
 # Dev Workflows
 
 Engineering workflows for this repo: the command index, the per-task checklists,
@@ -11,7 +11,13 @@ and the release process. Two companion docs carry the reference material:
 
 ## Commands
 - Agent docs health: `pnpm check:agent-docs`
-- Cold-start setup: `pnpm run setup`
+- Cold-start setup: `pnpm run setup` (also generates `LABEL_STUDIO_API_TOKEN` and `LABEL_STUDIO_PASSWORD` in `.env`)
+- Label Studio + ML backend: `docker compose up -d` (stop: `docker compose down`; reset Label Studio's data: `docker compose down -v`)
+- Bucket CORS for the web app and Label Studio: `services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply`
+- Seed CC0 images into a project: `services/api/.venv/bin/python services/api/scripts/seed_images.py --project <slug> [--limit N]`
+- Annotate from the latest run without a person (tests/demos): `services/api/.venv/bin/python services/api/scripts/annotate_from_prelabels.py --project <slug> [--skip-last | --only-last]`
+- ML backend unit tests: `pnpm test:ml`
+- Live end-to-end loop (Compose + B2 test bucket): `pnpm test:live:loop`
 - Preflight environment check: `pnpm run doctor`
 - Wait for the running stack: `pnpm wait-ready`
 - API contract export: `pnpm contract:export`
@@ -29,7 +35,7 @@ and the release process. Two companion docs carry the reference material:
 - Frontend typecheck: `pnpm typecheck`
 - Frontend lint: `pnpm lint`
 - Backend lint: `pnpm lint:api`
-- E2E: `pnpm test:e2e` (run `pnpm --filter @vibe-coding-starter-kit/web exec playwright install chromium` once first)
+- E2E: `pnpm test:e2e` (run `pnpm --filter @label-studio-prelabeling-dataset-versioning/web exec playwright install chromium` once first)
 - App verification specs: `pnpm test:verify` (specs in the gitignored `apps/web/e2e/verify/`)
 
 What each gate checks, its prerequisites, and how to recover when one fails:

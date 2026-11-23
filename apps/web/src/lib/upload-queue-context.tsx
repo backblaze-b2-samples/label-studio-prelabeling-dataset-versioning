@@ -29,7 +29,7 @@ import { interruptedUploadMessage, type UploadItem } from "@/lib/upload-status";
 
 const MAX_TOAST_FILE_NAME_LENGTH = 80;
 /** Names of uploads that were in flight, so a reload can own up to killing them. */
-const IN_FLIGHT_STORAGE_KEY = "vibe-coding-starter-kit:uploads-in-flight";
+const IN_FLIGHT_STORAGE_KEY = "label-studio-prelabeling-dataset-versioning:uploads-in-flight";
 
 function formatToastFileName(name: string) {
   if (name.length <= MAX_TOAST_FILE_NAME_LENGTH) return name;
@@ -38,10 +38,11 @@ function formatToastFileName(name: string) {
   return `${name.slice(0, sliceLength)}...${name.slice(-sliceLength)}`;
 }
 
-function createUploadItem(file: File): UploadItem {
+function createUploadItem(file: File, project: string): UploadItem {
   return {
     id: `${file.name}-${file.lastModified}-${Date.now()}-${Math.random()}`,
     file,
+    project,
     progress: 0,
     retryable: true,
     status: "uploading",
@@ -52,6 +53,7 @@ function createRejectedItem(file: File, error: string): UploadItem {
   return {
     id: `${file.name}-${file.lastModified}-${Date.now()}-${Math.random()}`,
     file,
+    project: "",
     progress: 0,
     error,
     retryable: false,
@@ -92,7 +94,7 @@ interface UploadQueueValue {
   items: UploadItem[];
   /** True while any row is still in flight. */
   uploading: boolean;
-  addFiles: (files: File[]) => void;
+  addFiles: (files: File[], project: string) => void;
   addRejections: (rejections: FileRejection[]) => void;
   retry: (id: string) => void;
   clearCompleted: () => void;
@@ -160,7 +162,7 @@ export function UploadQueueProvider({
           );
 
           try {
-            const response = await uploadFile(item.file, (percent) => {
+            const response = await uploadFile(item.file, item.project, (percent) => {
               setItems((prev) =>
                 prev.map((i) =>
                   i.id === item.id ? { ...i, progress: percent } : i,
@@ -206,12 +208,16 @@ export function UploadQueueProvider({
   );
 
   const addFiles = useCallback(
-    (files: File[]) => {
+    (files: File[], project: string) => {
       if (uploading) {
         toast.info("Wait for the current upload queue to finish first.");
         return;
       }
-      const newItems = files.map(createUploadItem);
+      if (!project) {
+        toast.error("Pick a project first: images go to that project's raw prefix.");
+        return;
+      }
+      const newItems = files.map((file) => createUploadItem(file, project));
       setItems((prev) => [...prev, ...newItems]);
       void runQueue(newItems);
     },

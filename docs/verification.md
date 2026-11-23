@@ -265,7 +265,7 @@ live there too.
 
 `pnpm verify` is the canonical credential-free non-live gate for PRs. It is composed of
 `pnpm check:agent-docs`, then `pnpm verify:api` (backend lint, backend tests,
-structural boundary tests), then `pnpm verify:web` (generated-file drift,
+structural boundary tests, ML backend tests), then `pnpm verify:web` (generated-file drift,
 frontend lint, frontend unit tests, frontend typecheck + build) — so the
 agent-doc guard runs first and CI can run all three checks as parallel jobs. `package.json` is the single
 source of truth for the literal command chain; when it changes, update the
@@ -279,6 +279,24 @@ To intentionally validate real connectivity with approved non-production
 credentials, run `RUN_LIVE_B2_TESTS=1 pnpm test:live:b2`. Without that explicit
 flag the live test skips, and it is never part of `pnpm verify` or CI.
 
+## Annotation loop checks
+
+Three levels, from cheapest to most real:
+
+| Level | Command | Needs | What it proves |
+|---|---|---|---|
+| Unit (hermetic) | `pnpm test:api` | nothing | key layout and name validation; COCO conversion (percent to pixels, category ids, empty annotations); the verification diff (complete and every flag reason); release refused while incomplete and on a re-cut (409); a tampered release fails re-verification; pre-label record shape; the Label Studio and ML backend clients against `httpx.MockTransport`; the project lifecycle with B2, Label Studio and the ML backend faked (`tests/fakes.py`); `httpx`/`boto3` only in `repo/` |
+| ML backend unit | `pnpm test:ml` | the light `services/ml-backend/.venv` | `/health`, `/setup`, `/predict` response shapes with a stub detector; device selection order CUDA -> MPS -> CPU; the backend's S3 client carries the attribution user agent |
+| Live loop | `pnpm test:live:loop` | `docker compose up -d`, a filled-in `.env` with a B2 **test** bucket | the whole loop against real Label Studio, the real model and real B2 (see the test's docstring); writes `.data/live-loop-evidence.json` and cleans up with `purge_b2=true` |
+
+Human checks (no automation can stand in for them): label a few tasks in the
+Label Studio UI — move, delete and add boxes — cut a release, and confirm the
+files appear under `labeling/exports/<project>/<release>/` in the Library and in
+the bucket explorer. The checklist is in the README.
+
+The Playwright smoke `apps/web/e2e/projects.spec.ts` drives project creation in
+a real browser with every API call mocked.
+
 The commands are deliberately composable: use the smaller commands while
 iterating, `pnpm verify` as the usual PR gate, and `pnpm verify:full` only when
 the live local prerequisites are available.
@@ -291,7 +309,8 @@ pnpm verify:full
 │  ├─ pnpm verify:api
 │  │  ├─ pnpm lint:api
 │  │  ├─ pnpm test:api
-│  │  └─ pnpm check:structure
+│  │  ├─ pnpm check:structure
+│  │  └─ pnpm test:ml
 │  └─ pnpm verify:web
 │     ├─ pnpm gen:check
 │     ├─ pnpm lint

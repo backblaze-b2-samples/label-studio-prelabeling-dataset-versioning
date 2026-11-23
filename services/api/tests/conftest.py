@@ -92,3 +92,46 @@ def isolate_download_counter(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "download_count_file", str(counter_path))
     monkeypatch.setattr(counter, "_count", 0)
     yield
+
+
+@pytest.fixture(autouse=True)
+def stub_companion_probes(monkeypatch):
+    """Keep /health hermetic: never probe a Label Studio or ML backend that a
+    developer may have running on localhost while the suite runs."""
+    from app.service import health as health_service
+    from app.types import ServiceStatus
+
+    monkeypatch.setattr(
+        health_service, "label_studio_status",
+        lambda: ServiceStatus(ok=True, url="http://ls.test", version="1.23.2"),
+    )
+    monkeypatch.setattr(
+        health_service, "ml_backend_status",
+        lambda: ServiceStatus(ok=True, url="http://ml.test", version="model", device="cpu"),
+    )
+
+
+@pytest.fixture
+def loop(monkeypatch):
+    """In-memory B2 + Label Studio + ML backend wired behind the service layer."""
+    from types import SimpleNamespace
+
+    from app.config import settings
+    from app.service import deps, seed
+    from tests.fakes import FakeB2, FakeLabelStudio, FakeML
+
+    monkeypatch.setattr(settings, "b2_bucket_name", "test-bucket")
+    b2 = FakeB2().install(monkeypatch)
+    ls = FakeLabelStudio(b2)
+    ml = FakeML()
+    monkeypatch.setattr(deps, "get_label_studio", lambda: ls)
+    monkeypatch.setattr(deps, "get_ml_backend", lambda: ml)
+
+    def fake_seed(slug, limit=None):
+        keys = [f"labeling/raw/{slug}/img{i}.jpg" for i in range(limit or 3)]
+        for key in keys:
+            b2.put_bytes(key, b"\xff\xd8\xff" + key.encode(), "image/jpeg")
+        return keys
+
+    monkeypatch.setattr(seed, "seed_project", fake_seed)
+    return SimpleNamespace(b2=b2, ls=ls, ml=ml, seed=fake_seed)

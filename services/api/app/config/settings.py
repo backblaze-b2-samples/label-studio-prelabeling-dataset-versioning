@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # app-config.ts, so this is the backend's declaration of the same slug:
     # keep it equal to the package name, and derive identifiers from it rather
     # than writing a second name a rename sweep has to know about.
-    app_slug: str = "vibe-coding-starter-kit"
+    app_slug: str = "label-studio-prelabeling-dataset-versioning"
 
     api_port: int = 8000
     # Interactive API docs (/docs, /redoc, /openapi.json). On by default for
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # Optional confinement for key-addressed reads/deletes. Empty by default so
     # the by-key routes accept any key shape (they deliberately support nested
     # folders and reserved-word segments). Point a fork at a bucket shared with
-    # other data? Set to e.g. "uploads/" to restrict all key ops to app uploads.
+    # other data? Set to "labeling/" to restrict all key ops to this app's prefix.
     allowed_key_prefix: str = ""
 
     # Full-bucket listing cache (repo/list_cache.py). Both /files and
@@ -100,6 +100,31 @@ class Settings(BaseSettings):
     # on every download — but a single added `--reload-include` would turn a
     # normal user action into an API restart that drops in-flight requests.
     download_count_file: str = ".data/download_count.json"
+
+    # --- Label Studio + ML backend (docker compose, localhost only) ---
+    # The API reaches both services from the host. Label Studio reaches the ML
+    # backend over the compose network instead, which is why the ML backend has
+    # two URLs: `ml_backend_url` (this API -> ML backend) and
+    # `ml_backend_internal_url` (Label Studio container -> ML backend).
+    label_studio_url: str = "http://localhost:8080"
+    # Bootstrap admin's legacy API token. `pnpm run setup` generates it into
+    # .env and docker compose passes the same value to Label Studio as
+    # LABEL_STUDIO_USER_TOKEN, so the two can never disagree.
+    label_studio_api_token: str = ""
+    ml_backend_url: str = "http://localhost:9090"
+    ml_backend_internal_url: str = "http://ml-backend:9090"
+    # Storage syncs run inside the Label Studio request when no Redis is
+    # configured (the compose default), so a sync of a few hundred images can
+    # take a while. Prediction batches on CPU are the slowest call of all.
+    label_studio_timeout_seconds: float = 120.0
+    ml_backend_timeout_seconds: float = 300.0
+    # Tasks per /predict call. Small on purpose: CPU inference holds the whole
+    # batch in memory, and a small batch keeps progress visible in the logs.
+    prelabel_batch_size: int = 4
+    # Local cache for the pinned CC0 seed images (downloaded once from
+    # Wikimedia Commons, sha256-checked, then reused for every new project).
+    # Resolved against the repo root like the download counter; gitignored.
+    seed_cache_dir: str = ".data/seed-images"
 
     # `extra: ignore` because the repo-root env file is shared: it also carries
     # frontend and script variables, and — after the rename to the standard B2

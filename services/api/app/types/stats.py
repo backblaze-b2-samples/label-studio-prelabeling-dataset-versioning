@@ -1,15 +1,8 @@
 from app.types.base import ResponseModel
 
 
-class DailyUploadCount(ResponseModel):
-    """One day's upload count, for the dashboard activity chart."""
-
-    date: str
-    uploads: int
-
-
 class UploadStats(ResponseModel):
-    """Aggregate bucket figures behind the dashboard stat cards."""
+    """Aggregate bucket figures behind the file browser and command palette."""
 
     total_files: int
     total_size_bytes: int

@@ -1,0 +1,153 @@
+{
+  "$comment": "Pinned seed images for the demo. Every entry is CC0 on Wikimedia Commons (checked through the Commons API, extmetadata.LicenseShortName) and gave at least one person/car/bicycle/bus detection at threshold 0.5 with the pinned RT-DETR R18 revision. Files are downloaded at run time and checked against sha256; no image binaries are committed. The first four are the small set the live loop test seeds.",
+  "images": [
+    {
+      "filename": "floating-bus-stop.jpg",
+      "title": "File:Floating Bus Stop.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/9c/Floating_Bus_Stop.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Floating_Bus_Stop.jpg",
+      "author": "Camden Cyclists",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "7743bdb9a4fb13c791f466173f94b70fbcce81f467dde644a58c1a006bdc47cc",
+      "bytes": 467820,
+      "width": 864,
+      "height": 1152,
+      "detections_at_0_5": {
+        "car": 4,
+        "truck": 1
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "hanoi-street-foot-traffic.jpg",
+      "title": "File:Hanoi Street Foot Traffic.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/72/Hanoi_Street_Foot_Traffic.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Hanoi_Street_Foot_Traffic.jpg",
+      "author": "Arnaud Matar",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "5146edd2d8f4f41b56ac688b4f487af5399455718f7d435ad9da3a760bd84e87",
+      "bytes": 410590,
+      "width": 1500,
+      "height": 1000,
+      "detections_at_0_5": {
+        "person": 11,
+        "motorbike": 3,
+        "banana": 2
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "people-gathering-at-the-corner-of-coventry-stree.jpg",
+      "title": "File:People gathering at the corner of Coventry Street and Great Windmill street, London - 1947.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/23/People_gathering_at_the_corner_of_Coventry_Street_and_Great_Windmill_street%2C_London_-_1947.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:People_gathering_at_the_corner_of_Coventry_Street_and_Great_Windmill_street,_London_-_1947.jpg",
+      "author": "Willem van de Poll",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "087f097b8bdae641ab500bfecad8d84419a5b77dbedff415a6d5660d2de0d89c",
+      "bytes": 657858,
+      "width": 2634,
+      "height": 2581,
+      "detections_at_0_5": {
+        "person": 11
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "route-66-at-launceston-street-bus-stop-2026.jpg",
+      "title": "File:Route 66 at Launceston Street bus stop 2026.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Route_66_at_Launceston_Street_bus_stop_2026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Route_66_at_Launceston_Street_bus_stop_2026.jpg",
+      "author": "Totallynotarandomalt69",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "4ab479fec40cf09239fb57dbb7c17fe3b7fe9d2ca33d7d9e75dbdb360592948e",
+      "bytes": 1022447,
+      "width": 3044,
+      "height": 2029,
+      "detections_at_0_5": {
+        "bus": 1,
+        "person": 1
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "1985-boys-regulating-traffic-at-chiang-rai-road.jpg",
+      "title": "File:1985. Boys regulating traffic at Chiang Rai road junction. Archiv Spielvogel.JPG",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/40/1985._Boys_regulating_traffic_at_Chiang_Rai_road_junction._Archiv_Spielvogel.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:1985._Boys_regulating_traffic_at_Chiang_Rai_road_junction._Archiv_Spielvogel.JPG",
+      "author": "Spielvogel",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "c2c0e1b90ce79d4d89c6cd0f17a3faf7d0760b748e336b458463a87f40ee7ae5",
+      "bytes": 1081813,
+      "width": 3587,
+      "height": 2155,
+      "detections_at_0_5": {
+        "person": 6,
+        "traffic light": 2,
+        "car": 5,
+        "motorbike": 2,
+        "bicycle": 1
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "bus-stop-bypass-outside-stable-market.jpg",
+      "title": "File:Bus stop bypass outside Stable Market.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/b2/Bus_stop_bypass_outside_Stable_Market.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bus_stop_bypass_outside_Stable_Market.jpg",
+      "author": "Camden Cyclists",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "06a23eb4481b4db0c1e4c6986dd6e30c0ce4ffb8b07873561d9a165876d255d2",
+      "bytes": 1668051,
+      "width": 4032,
+      "height": 3024,
+      "detections_at_0_5": {
+        "person": 3,
+        "bicycle": 1
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "bus-stop-outside-haverstock-school.jpg",
+      "title": "File:Bus stop outside Haverstock School.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/07/Bus_stop_outside_Haverstock_School.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bus_stop_outside_Haverstock_School.jpg",
+      "author": "Camden Cyclists",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "c0bdf6b64c86df09dd3e3e20816225479854113e95e408b9c278f3131aec9564",
+      "bytes": 2495731,
+      "width": 3955,
+      "height": 2966,
+      "detections_at_0_5": {
+        "person": 3,
+        "bus": 1
+      },
+      "checked_at": "2026-11-23"
+    },
+    {
+      "filename": "traffic-jam-at-the-entrance-into-korolev.jpg",
+      "title": "File:Traffic jam - at the entrance into Korolev.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Traffic_jam_-_at_the_entrance_into_Korolev.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Traffic_jam_-_at_the_entrance_into_Korolev.jpg",
+      "author": "Sergey Tchernyakov",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sha256": "71f592e94e4e9169cd01fc9c712466dca89316b660efe80b8ddad87c51109f6c",
+      "bytes": 1961081,
+      "width": 2665,
+      "height": 1772,
+      "detections_at_0_5": {
+        "car": 11,
+        "truck": 3,
+        "person": 1
+      },
+      "checked_at": "2026-11-23"
+    }
+  ]
+}

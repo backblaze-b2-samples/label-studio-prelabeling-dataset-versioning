@@ -9,6 +9,8 @@ interface DropzoneProps {
   onFilesSelected: (files: File[]) => void;
   onFilesRejected: (rejections: FileRejection[]) => void;
   disabled?: boolean;
+  /** Why the dropzone is disabled, when it is not an in-flight queue. */
+  disabledReason?: { title: string; description: string };
 }
 
 const MAX_SIZE = 100 * 1024 * 1024; // 100MB
@@ -17,6 +19,7 @@ export function Dropzone({
   onFilesSelected,
   onFilesRejected,
   disabled,
+  disabledReason,
 }: DropzoneProps) {
   const descriptionId = useId();
   const onDrop = useCallback(
@@ -45,10 +48,13 @@ export function Dropzone({
   });
 
   const active = isDragActive && !disabled;
-  let title = "Drag & drop files here, or click to browse";
-  let description = "Max file size: 100 MB per file";
+  let title = "Drag & drop images here, or click to browse";
+  let description = "JPEG, PNG or WebP, up to 100 MB each";
 
-  if (disabled) {
+  if (disabled && disabledReason) {
+    title = disabledReason.title;
+    description = disabledReason.description;
+  } else if (disabled) {
     title = "Uploads in progress";
     description = "New files can be added when the current queue finishes.";
   } else if (active) {

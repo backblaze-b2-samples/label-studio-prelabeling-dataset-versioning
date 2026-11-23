@@ -17,11 +17,9 @@ from app.service.files import (
     get_files,
     get_preview_url,
     get_stats,
-    get_upload_activity,
     remove_file,
 )
 from app.types import (
-    DailyUploadCount,
     DeleteFileResponse,
     FileMetadata,
     FileMetadataDetail,
@@ -97,13 +95,6 @@ def list_files_endpoint(prefix: str = "", limit: int = 100):
 @router.get("/files/stats", response_model=UploadStats)
 def stats_endpoint():
     return get_stats()
-
-
-@router.get("/files/stats/activity", response_model=list[DailyUploadCount])
-def upload_activity_endpoint(days: int = 7):
-    if days < 1 or days > 90:
-        raise HTTPException(status_code=400, detail="Days must be between 1 and 90")
-    return get_upload_activity(days=days)
 
 
 @router.get("/files-by-key/download", response_model=FileUrlResponse)

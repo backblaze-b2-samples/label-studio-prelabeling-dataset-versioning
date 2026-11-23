@@ -34,6 +34,14 @@ route. Build new screens from these primitives and tokens — don't hand-roll.
 4. Cover every state: `Skeleton` while loading, `EmptyState` when there's no
    data, `<ErrorState error={error} onRetry={...} />` on fetch failure.
 5. Style through tokens (`bg-*`, `text-*`, `var(--token)`) — no hex literals.
+6. A short finite choice (the 0.3 / 0.5 / 0.7 threshold) is a
+   `components/common/segmented-control.tsx`; a longer finite set (labels) is a
+   checkbox group. Never free text for a finite set.
+
+Project-scoped data (`/projects/{slug}/…`) uses `projectKeys` in `queries.ts`:
+the generator builds keys from query parameters only, so the slug is appended
+there, and every project key sits under `qk.projects()` — one invalidation
+refreshes every project view after a sync, run or release.
 
 ## Data Fetching
 

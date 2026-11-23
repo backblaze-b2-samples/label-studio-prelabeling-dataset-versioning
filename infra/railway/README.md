@@ -60,12 +60,15 @@ them in a config file, commit, issue, PR, terminal transcript, or screenshot.
 <!-- gen:begin railway-variables -->
 | Service | Variable names | Classification | Notes |
 | --- | --- | --- | --- |
-| API | `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY` | **Secret** | Restrict the B2 key to the intended bucket and least privilege. |
+| API | `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `LABEL_STUDIO_API_TOKEN`, `LABEL_STUDIO_PASSWORD` | **Secret** | Restrict the B2 key to the intended bucket and least privilege. |
 | API | `B2_BUCKET_NAME` | Non-secret configuration | bucket unique name (**Bucket Unique Name** in the B2 console). |
 | API | `B2_REGION` | Non-secret configuration | the region inside the bucket's **Endpoint** (`s3.<region>.backblazeb2.com`); the S3 endpoint is derived from it. |
 | API | `B2_PUBLIC_URL_BASE` | Non-secret configuration | public object base URL, when the bucket is public. |
+| API | `LABEL_STUDIO_URL` | Non-secret configuration | Label Studio base URL; defaults to http://localhost:8080. |
+| API | `LABEL_STUDIO_USERNAME` | Non-secret configuration | local bootstrap admin email for Label Studio. |
+| API | `ML_BACKEND_URL` | Non-secret configuration | ML backend base URL as the API reaches it; defaults to http://localhost:9090. |
 | Web | `NEXT_PUBLIC_API_URL` | Public build-time configuration | separate-origin deploys only; Next.js inlines it at build time. |
-| API | `ENABLE_DOCS`, `ALLOWED_KEY_PREFIX` | Non-secret configuration | Set `ENABLE_DOCS=false` in production. `ALLOWED_KEY_PREFIX=uploads/` confines key operations when the bucket is shared. |
+| API | `ENABLE_DOCS`, `ALLOWED_KEY_PREFIX` | Non-secret configuration | Set `ENABLE_DOCS=false` in production. `ALLOWED_KEY_PREFIX=labeling/` confines key operations when the bucket is shared. |
 | API | `API_CORS_ORIGINS`, `API_CORS_ORIGIN_REGEX` | Non-secret service configuration | Set the exact web origin per environment; never a broad production origin to cover rotating previews. |
 | API | rate and size settings | Non-secret service configuration | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_WRITE_PER_MINUTE`, `MAX_FILE_SIZE`. |
 <!-- gen:end railway-variables -->

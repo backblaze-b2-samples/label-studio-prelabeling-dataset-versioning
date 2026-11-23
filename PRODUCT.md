@@ -2,20 +2,24 @@
 
 ## Users
 
-AI coding agents and "vibe coders" (developers who lean on AI to move fast) who clone
-this kit as the foundation for a new full-stack app. Their context: they want to skip
-the boilerplate loop (dashboard, upload, file browser, cloud storage wiring) and go
-straight to building their app's unique features. They read the repo, keep the shared
-scaffolding, and rebrand + rewrite the dashboard for their own use case.
+Data providers and physical AI teams who run Label Studio and need versioned,
+auditable training data releases — and the developers (and their coding agents)
+who wire Label Studio into their storage. Their context: annotators label every
+image from scratch, and raw data, model suggestions and final labels end up in
+different places, so nobody can rebuild or audit a training set later.
 
 ## Product Purpose
 
-An engineering-grade full-stack starter kit (Next.js 16 + React 19 + Tailwind v4 +
-shadcn/ui frontend, FastAPI backend) with Backblaze B2 cloud storage integrated out of
-the box. It ships a dashboard, drag-and-drop upload, and a file browser so builders
-start from a working app, not a blank page. Success = a builder can clone it, run it,
-rebrand it via one config file, and trust every screen enough to build on top without
-first fixing it.
+Label Studio Prelabeling Dataset Versioning connects Label Studio Community
+Edition to one Backblaze B2 bucket as both source and target storage, pre-labels
+every task with a local, Apache-2.0 object detector so annotators only correct,
+and cuts immutable COCO releases with a manifest of every task, pre-label and
+annotation. Success = a team can point Label Studio at B2 in minutes, see exactly
+which tasks are missing a label, and rebuild or audit any release from the bucket
+alone.
+
+Out of scope: patching Label Studio, a custom labeling UI, multi-user or SSO
+setup, active learning, model training, and hosting Label Studio publicly.
 
 ## Maturity and Support Boundary
 
@@ -29,8 +33,8 @@ and no SLA is provided for the repository software.
 
 ## Brand Personality
 
-Confident, precise, quietly professional. Voice is direct and free of hype ("Stop
-wiring boilerplate and start building"). The interface should feel like a modern
+Confident, precise, quietly professional. Voice is direct and free of hype ("Pre-label,
+correct and release datasets with Label Studio on B2."). The interface should feel like a modern
 developer tool — considered, calm, trustworthy — not a marketing showpiece. It is a
 **neutral foundation** that others rebrand: the design carries craft through restraint,
 not through a strong opinionated identity of its own.

@@ -5,7 +5,7 @@ import socket
 import pytest
 
 from app.repo import b2_client
-from app.runtime import health as health_runtime
+from app.service import health as health_service
 
 
 def test_normal_suite_blocks_network():
@@ -25,16 +25,32 @@ async def test_health_reports_connectivity(
     client, monkeypatch, b2_connected, expected_status
 ):
     monkeypatch.setattr(
-        health_runtime, "check_connectivity", lambda: b2_connected
+        health_service, "check_connectivity", lambda: b2_connected
     )
 
     response = await client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": expected_status,
-        "b2_connected": b2_connected,
-    }
+    body = response.json()
+    assert body["status"] == expected_status
+    assert body["b2_connected"] is b2_connected
+    assert body["label_studio"]["ok"] is True
+    assert body["ml_backend"]["device"] == "cpu"
+
+
+@pytest.mark.asyncio
+async def test_health_degraded_when_label_studio_down(client, monkeypatch):
+    from app.types import ServiceStatus
+
+    monkeypatch.setattr(health_service, "check_connectivity", lambda: True)
+    monkeypatch.setattr(
+        health_service,
+        "label_studio_status",
+        lambda: ServiceStatus(ok=False, url="http://ls.test", detail="refused"),
+    )
+    body = (await client.get("/health")).json()
+    assert body["status"] == "degraded"
+    assert body["label_studio"]["detail"] == "refused"
 
 
 def test_s3_client_has_bounded_network_waits(monkeypatch):
@@ -50,6 +66,7 @@ def test_s3_client_has_bounded_network_waits(monkeypatch):
     b2_client.get_s3_client()
 
     config = captured["config"]
+    assert config.user_agent_extra == "b2ai-label-studio-annotation-loop"
     assert config.connect_timeout == 5
     assert config.read_timeout == 30
     assert config.retries == {"mode": "standard", "total_max_attempts": 3}

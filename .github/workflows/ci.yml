@@ -84,6 +84,15 @@ jobs:
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install -r requirements.lock
 
+      # `pnpm verify:api` also runs `pnpm test:ml`: the ML backend's HTTP and
+      # device-selection tests. They use a stub detector, so no torch here.
+      - name: Install ML backend test dependencies
+        working-directory: services/ml-backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements-test.txt
+
       - name: Backend lint, tests, structure boundaries
         run: pnpm verify:api
 

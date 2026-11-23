@@ -66,12 +66,15 @@ Set values in the Vercel Project and environment. Never put values in
 <!-- gen:begin vercel-variables -->
 | Variable names | Classification | Notes |
 | --- | --- | --- |
-| `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY` | **Secret** | Restrict the B2 key to the intended bucket and least privilege. |
+| `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `LABEL_STUDIO_API_TOKEN`, `LABEL_STUDIO_PASSWORD` | **Secret** | Restrict the B2 key to the intended bucket and least privilege. |
 | `B2_BUCKET_NAME` | Non-secret configuration | bucket unique name (**Bucket Unique Name** in the B2 console). |
 | `B2_REGION` | Non-secret configuration | the region inside the bucket's **Endpoint** (`s3.<region>.backblazeb2.com`); the S3 endpoint is derived from it. |
 | `B2_PUBLIC_URL_BASE` | Non-secret configuration | public object base URL, when the bucket is public. |
+| `LABEL_STUDIO_URL` | Non-secret configuration | Label Studio base URL; defaults to http://localhost:8080. |
+| `LABEL_STUDIO_USERNAME` | Non-secret configuration | local bootstrap admin email for Label Studio. |
+| `ML_BACKEND_URL` | Non-secret configuration | ML backend base URL as the API reaches it; defaults to http://localhost:9090. |
 | `NEXT_PUBLIC_API_URL` | Public build-time configuration | separate-origin deploys only; Next.js inlines it at build time. |
-| `ENABLE_DOCS`, `ALLOWED_KEY_PREFIX` | Non-secret configuration | Set `ENABLE_DOCS=false` in production. `ALLOWED_KEY_PREFIX=uploads/` confines key operations when the bucket is shared. |
+| `ENABLE_DOCS`, `ALLOWED_KEY_PREFIX` | Non-secret configuration | Set `ENABLE_DOCS=false` in production. `ALLOWED_KEY_PREFIX=labeling/` confines key operations when the bucket is shared. |
 | `MAX_FILE_SIZE` | Optional configuration | Uploads go directly to B2 (presigned PUT), so the platform's Function payload limit no longer applies — leave at the default or set your own cap. |
 | `WARM_LIST_CACHE_ON_STARTUP=false` | Recommended on this platform | Avoid an expensive full B2 scan on each cold start. |
 | `DOWNLOAD_COUNT_FILE=/tmp/download_count.json` | Optional ephemeral configuration | Lets a warm Function instance write the counter, but it is not durable or shared. |
@@ -135,16 +138,18 @@ repo-root `vercel.json` and creates one Services project:
 <!-- gen:begin vercel-deploy-button -->
 | `root-directory` | Pre-filled `env` |
 | --- | --- |
-| _(none — repo root)_ | `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_REGION` |
+| _(none — repo root)_ | `B2_APPLICATION_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_REGION`, `LABEL_STUDIO_API_TOKEN` |
 
 Alongside `repository-url` and the `env` list, the button carries the
 presentation parameters the clone flow renders in its preview card:
-`project-name` and `repository-name` (both `vibe-coding-starter-kit`, so the cloned repo and
+`project-name` and `repository-name` (both `label-studio-prelabeling-dataset-versioning`, so the cloned repo and
 the created Project get a readable default name), plus
-`demo-title`, `demo-description`, `demo-image`.
+`demo-title`, `demo-description`.
 
-`demo-image` points at `docs/images/b2-starterkit-dashboard1.png`, resolved against this
-repository's default branch.
+There is no `demo-image`: this repository ships no screenshots yet, and a
+button parameter pointing at a file that does not exist renders a broken
+card. Add entries to `docs/exec-plans/sample.json` `screenshots` and re-run
+`pnpm gen:docs` to include one.
 
 There is no `demo-url`: this repository hosts no public demo deployment, and
 the API is unauthenticated and bucket-wide (see

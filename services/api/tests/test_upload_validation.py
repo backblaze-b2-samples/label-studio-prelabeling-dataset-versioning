@@ -1,4 +1,4 @@
-"""Unit + integration tests for upload validation and content sniffing."""
+"""Unit + integration tests for raw-image upload validation and content sniffing."""
 
 from datetime import UTC, datetime
 
@@ -18,13 +18,15 @@ from app.service.upload import (
 )
 from app.types import FileMetadata
 
+RAW = "labeling/raw/street/"
+
 
 def _meta(key: str, *, size_bytes: int, content_type: str) -> FileMetadata:
     filename = key.rsplit("/", 1)[-1]
     return FileMetadata(
         key=key,
         filename=filename,
-        folder="uploads/",
+        folder=RAW,
         size_bytes=size_bytes,
         size_human=f"{size_bytes} B",
         content_type=content_type,
@@ -32,39 +34,38 @@ def _meta(key: str, *, size_bytes: int, content_type: str) -> FileMetadata:
         url=None,
     )
 
+
 # --- sanitize_filename ------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("../../etc/passwd", "passwd"),  # path components stripped
-        ("a\x00b.txt", "ab.txt"),  # null byte removed
-        ("my file.txt", "my_file.txt"),  # unsafe char substituted
-        ("...hidden", "_hidden"),  # dot run collapses to _ before dot-strip
-        ("", "unnamed"),  # empty → placeholder
-        ("/", "unnamed"),  # only a path separator → placeholder
+        ("../../etc/passwd", "passwd"),
+        ("a\x00b.jpg", "ab.jpg"),
+        ("my file.jpg", "my_file.jpg"),
+        ("...hidden", "_hidden"),
+        ("", "unnamed"),
+        ("/", "unnamed"),
     ],
 )
 def test_sanitize_filename(raw, expected):
     assert sanitize_filename(raw) == expected
 
 
-@pytest.mark.parametrize(
-    "raw",
-    [
-        "a" * 300 + ".txt",  # long name with extension
-        "a" * 300,  # long name, NO extension (regression: was 301 chars + ".")
-        "a" * 300 + "." + "b" * 250,  # absurdly long extension
-    ],
-)
+@pytest.mark.parametrize("raw", ["a" * 300 + ".jpg", "a" * 300, "a" * 300 + "." + "b" * 250])
 def test_sanitize_filename_truncates_long_names(raw):
     result = sanitize_filename(raw)
     assert len(result) <= 200
     assert not result.startswith(".")
 
 
-# --- validate_extension_matches_type ----------------------------------------
+# --- types: raw images only -------------------------------------------------
+
+
+def test_only_label_studio_importable_images_are_allowed():
+    assert {"image/jpeg", "image/png", "image/webp"} == ALLOWED_TYPES
+    assert all(content_type_has_signature(ct) for ct in ALLOWED_TYPES)
 
 
 @pytest.mark.parametrize(
@@ -72,77 +73,34 @@ def test_sanitize_filename_truncates_long_names(raw):
     [
         ("photo.jpg", "image/jpeg", True),
         ("photo.jpeg", "image/jpeg", True),
-        ("photo.png", "image/jpeg", False),  # extension/type mismatch
-        ("noext", "image/jpeg", True),  # no extension → not enforced
-        ("x.exe", "image/jpeg", False),
-        ("x.pdf", "application/octet-stream", False),  # type not in map
-        # Added file types (markdown, configs, datasets, office docs, video).
-        ("notes.md", "text/markdown", True),
-        ("notes.markdown", "text/markdown", True),
-        ("config.yaml", "application/yaml", True),
-        ("config.yml", "application/x-yaml", True),
-        ("data.jsonl", "application/x-ndjson", True),
-        ("data.ndjson", "application/x-ndjson", True),
-        ("table.tsv", "text/tab-separated-values", True),
-        ("feed.xml", "application/xml", True),
-        ("feed.xml", "text/xml", True),
-        (
-            "report.docx",
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document",
-            True,
-        ),
-        (
-            "sheet.xlsx",
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet",
-            True,
-        ),
-        ("clip.mov", "video/quicktime", True),
-        ("clip.webm", "video/webm", True),
-        ("clip.mp4", "video/quicktime", False),  # extension/type mismatch
+        ("photo.png", "image/png", True),
+        ("photo.webp", "image/webp", True),
+        ("photo.png", "image/jpeg", False),
+        ("x.gif", "image/gif", False),
+        ("x.pdf", "application/pdf", False),
     ],
 )
 def test_validate_extension_matches_type(filename, content_type, expected):
     assert validate_extension_matches_type(filename, content_type) is expected
 
 
-# --- matches_content_signature ----------------------------------------------
-
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 _JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 8
-_PDF = b"%PDF-1.7\n"
-_ZIP = b"PK\x03\x04" + b"\x00" * 8
+_WEBP = b"RIFF\x00\x00\x00\x00WEBPVP8 "
 
 
 @pytest.mark.parametrize(
     ("data", "content_type", "expected"),
     [
         (_PNG, "image/png", True),
-        (b"<html>not a png", "image/png", False),  # spoofed image
+        (b"<html>not a png", "image/png", False),
         (_JPEG, "image/jpeg", True),
-        (_PDF, "application/pdf", True),
-        (b"nope", "application/pdf", False),
-        (_ZIP, "application/zip", True),
-        (b"any text at all", "text/plain", True),  # text has no signature
-        (b"{}", "application/json", True),  # json has no signature
+        (_WEBP, "image/webp", True),
+        (_PNG, "image/webp", False),
     ],
 )
 def test_matches_content_signature(data, content_type, expected):
     assert matches_content_signature(data, content_type) is expected
-
-
-def test_signature_predicate_agrees_with_checker():
-    """`content_type_has_signature` and `matches_content_signature` share one
-    source, so every allowed type is classified consistently — this guards the
-    verify fast-path that skips the Range-GET for signature-less types."""
-    for ct in ALLOWED_TYPES:
-        if content_type_has_signature(ct):
-            # a real signature rejects an all-zero header
-            assert matches_content_signature(b"\x00" * 16, ct) is False
-        else:
-            # a signature-less type accepts anything
-            assert matches_content_signature(b"\x00" * 16, ct) is True
 
 
 # --- presign-time declared-upload validation --------------------------------
@@ -151,175 +109,104 @@ def test_signature_predicate_agrees_with_checker():
 def test_presign_rejects_oversized(monkeypatch):
     monkeypatch.setattr(upload_service.settings, "max_file_size", 10)
     with pytest.raises(UploadError) as exc:
-        _validate_declared("a.txt", "text/plain", 999)
+        _validate_declared("street", "a.jpg", "image/jpeg", 999)
     assert exc.value.status_code == 413
 
 
-def test_presign_rejects_disallowed_type():
+@pytest.mark.parametrize(("filename", "content_type"), [("a.txt", "text/plain"), ("a.gif", "image/gif")])
+def test_presign_rejects_non_image_types(filename, content_type):
     with pytest.raises(UploadError) as exc:
-        _validate_declared("a.exe", "application/x-msdownload", 4)
+        _validate_declared("street", filename, content_type, 4)
     assert exc.value.status_code == 415
 
 
 def test_presign_rejects_extension_mismatch():
     with pytest.raises(UploadError) as exc:
-        _validate_declared("a.png", "text/plain", 4)
+        _validate_declared("street", "a.png", "image/jpeg", 4)
     assert exc.value.status_code == 415
 
 
-def test_presign_rejects_empty_file():
+def test_presign_rejects_empty_file_and_bad_project():
     with pytest.raises(UploadError):
-        _validate_declared("a.txt", "text/plain", 0)
+        _validate_declared("street", "a.jpg", "image/jpeg", 0)
+    with pytest.raises(UploadError):
+        _validate_declared("../evil", "a.jpg", "image/jpeg", 4)
 
 
-def test_presign_returns_signed_put(monkeypatch):
+def test_presign_returns_signed_put_into_project_prefix(monkeypatch):
     captured = {}
 
     def fake_sign(key, content_type, content_length, expires_in):
-        captured.update(
-            key=key,
-            content_type=content_type,
-            content_length=content_length,
-            expires_in=expires_in,
-        )
+        captured.update(key=key, content_type=content_type, content_length=content_length)
         return "https://b2.example/signed-put"
 
     monkeypatch.setattr(upload_service, "generate_presigned_upload", fake_sign)
-    result = create_presigned_upload("My Photo.png", "image/png", 1234)
+    monkeypatch.setattr(upload_service.descriptors, "exists", lambda slug: True)
+    result = create_presigned_upload("street", "My Photo.png", "image/png", 1234)
 
-    assert result.key == "uploads/My_Photo.png"
-    assert result.url == "https://b2.example/signed-put"
+    assert result.key == f"{RAW}My_Photo.png"
     assert result.headers["Content-Type"] == "image/png"
-    # The exact size + type are signed in, so B2 enforces them.
     assert captured["content_length"] == 1234
-    assert captured["content_type"] == "image/png"
 
 
-# --- newly allowed file types clear presign validation ----------------------
-
-
-@pytest.mark.parametrize(
-    ("filename", "content_type"),
-    [
-        ("notes.md", "text/markdown"),
-        ("config.yaml", "application/yaml"),
-        ("config.yml", "application/x-yaml"),
-        ("data.jsonl", "application/x-ndjson"),
-        ("table.tsv", "text/tab-separated-values"),
-        ("feed.xml", "application/xml"),
-        ("feed.xml", "text/xml"),
-        (
-            "report.docx",
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document",
-        ),
-        (
-            "sheet.xlsx",
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet",
-        ),
-        (
-            "deck.pptx",
-            "application/vnd.openxmlformats-officedocument."
-            "presentationml.presentation",
-        ),
-        ("clip.mov", "video/quicktime"),
-        ("clip.webm", "video/webm"),
-    ],
-)
-def test_presign_accepts_new_filetypes(filename, content_type):
-    """Each newly allowed type clears the allow-list + extension checks."""
-    assert _validate_declared(filename, content_type, 16) == f"uploads/{filename}"
+def test_presign_unknown_project_is_404(monkeypatch):
+    monkeypatch.setattr(upload_service.descriptors, "exists", lambda slug: False)
+    with pytest.raises(UploadError) as exc:
+        create_presigned_upload("nobody", "a.jpg", "image/jpeg", 10)
+    assert exc.value.status_code == 404
 
 
 # --- post-upload verification (HEAD + Range-GET sniff) -----------------------
-
-_PNG_HEAD = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 
 
 def _wire_verify(monkeypatch, *, metadata, head_bytes):
     deleted: list[str] = []
     invalidated: list[bool] = []
-    monkeypatch.setattr(
-        upload_service, "get_file_metadata", lambda key: metadata
-    )
-    monkeypatch.setattr(
-        upload_service, "get_object_head_bytes", lambda key, length: head_bytes
-    )
-    monkeypatch.setattr(
-        upload_service, "delete_file", lambda key: deleted.append(key)
-    )
-    monkeypatch.setattr(
-        upload_service, "invalidate_listing", lambda: invalidated.append(True)
-    )
+    monkeypatch.setattr(upload_service, "get_file_metadata", lambda key: metadata)
+    monkeypatch.setattr(upload_service, "get_object_head_bytes", lambda key, length: head_bytes)
+    monkeypatch.setattr(upload_service, "delete_file", lambda key: deleted.append(key))
+    monkeypatch.setattr(upload_service, "invalidate_listing", lambda: invalidated.append(True))
     return deleted, invalidated
 
 
 def test_verify_accepts_valid_object(monkeypatch):
-    meta = _meta("uploads/a.png", size_bytes=16, content_type="image/png")
-    deleted, invalidated = _wire_verify(
-        monkeypatch, metadata=meta, head_bytes=_PNG_HEAD
-    )
-    result = verify_upload("uploads/a.png")
-    assert result.key == "uploads/a.png"
-    assert result.metadata is None  # rich extraction stays on-demand
-    assert deleted == []
-    assert invalidated == [True]  # new object made visible
+    meta = _meta(f"{RAW}a.png", size_bytes=16, content_type="image/png")
+    deleted, invalidated = _wire_verify(monkeypatch, metadata=meta, head_bytes=_PNG)
+    result = verify_upload(f"{RAW}a.png")
+    assert result.key == f"{RAW}a.png"
+    assert deleted == [] and invalidated == [True]
 
 
 def test_verify_rejects_and_deletes_signature_mismatch(monkeypatch):
-    meta = _meta("uploads/a.png", size_bytes=16, content_type="image/png")
-    deleted, _ = _wire_verify(
-        monkeypatch, metadata=meta, head_bytes=b"<html>not a png"
-    )
+    meta = _meta(f"{RAW}a.png", size_bytes=16, content_type="image/png")
+    deleted, _ = _wire_verify(monkeypatch, metadata=meta, head_bytes=b"<html>not a png")
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/a.png")
+        verify_upload(f"{RAW}a.png")
     assert exc.value.status_code == 415
-    assert deleted == ["uploads/a.png"]  # invalid object removed
+    assert deleted == [f"{RAW}a.png"]
 
 
 def test_verify_rejects_oversize(monkeypatch):
     monkeypatch.setattr(upload_service.settings, "max_file_size", 10)
-    meta = _meta("uploads/big.txt", size_bytes=999, content_type="text/plain")
-    deleted, _ = _wire_verify(monkeypatch, metadata=meta, head_bytes=b"x")
+    meta = _meta(f"{RAW}big.jpg", size_bytes=999, content_type="image/jpeg")
+    deleted, _ = _wire_verify(monkeypatch, metadata=meta, head_bytes=_JPEG)
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/big.txt")
+        verify_upload(f"{RAW}big.jpg")
     assert exc.value.status_code == 413
-    assert deleted == ["uploads/big.txt"]
+    assert deleted == [f"{RAW}big.jpg"]
 
 
 def test_verify_missing_object_is_404(monkeypatch):
     deleted, _ = _wire_verify(monkeypatch, metadata=None, head_bytes=b"")
     with pytest.raises(UploadError) as exc:
-        verify_upload("uploads/gone.txt")
+        verify_upload(f"{RAW}gone.jpg")
     assert exc.value.status_code == 404
-    assert deleted == []  # nothing to delete
+    assert deleted == []
 
 
-def test_verify_rejects_key_outside_uploads_prefix():
+def test_verify_rejects_key_outside_raw_prefix():
     with pytest.raises(UploadError):
-        verify_upload("other/evil.txt")
-
-
-def test_verify_skips_range_get_for_signatureless_type(monkeypatch):
-    """Text/data types have no signature, so verify must not fetch header bytes."""
-    meta = _meta("uploads/notes.md", size_bytes=12, content_type="text/markdown")
-    fetched: list[int] = []
-    monkeypatch.setattr(upload_service, "get_file_metadata", lambda key: meta)
-    monkeypatch.setattr(
-        upload_service,
-        "get_object_head_bytes",
-        lambda key, length: fetched.append(length) or b"",
-    )
-    monkeypatch.setattr(upload_service, "delete_file", lambda key: None)
-    monkeypatch.setattr(upload_service, "invalidate_listing", lambda: None)
-
-    result = verify_upload("uploads/notes.md")
-    assert result.key == "uploads/notes.md"
-    assert fetched == []  # no wasted Range-GET
-
-
-# --- uploads_total metric increments on verify ------------------------------
+        verify_upload("uploads/evil.jpg")
 
 
 @pytest.mark.asyncio
@@ -327,10 +214,10 @@ async def test_successful_verify_increments_uploads_metric(client, monkeypatch):
     from app.runtime import metrics
 
     monkeypatch.setattr(metrics, "_upload_count", 0)
-    meta = _meta("uploads/a.txt", size_bytes=5, content_type="text/plain")
-    _wire_verify(monkeypatch, metadata=meta, head_bytes=b"hello")
+    meta = _meta(f"{RAW}a.jpg", size_bytes=5, content_type="image/jpeg")
+    _wire_verify(monkeypatch, metadata=meta, head_bytes=_JPEG)
 
-    resp = await client.post("/upload/verify", json={"key": "uploads/a.txt"})
+    resp = await client.post("/upload/verify", json={"key": f"{RAW}a.jpg"})
     assert resp.status_code == 200
 
     metrics_resp = await client.get("/metrics")

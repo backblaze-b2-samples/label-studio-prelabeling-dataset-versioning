@@ -11,7 +11,7 @@
 
 /** The verbs this app's routes actually use, narrowed from the contract. */
 export type ApiClientRoute = {
-  method: "delete" | "get" | "post";
+  method: "delete" | "get" | "patch" | "post";
   path: string;
 };
 
@@ -24,6 +24,7 @@ export type ApiClientRoute = {
 export const API_CLIENT_ROUTES = {
   fileByKeyDelete: { method: "delete", path: "/files-by-key" },
   legacyFileDelete: { method: "delete", path: "/files/{key}" },
+  projectDelete: { method: "delete", path: "/projects/{slug}" },
   files: { method: "get", path: "/files" },
   fileByKeyDetail: { method: "get", path: "/files-by-key/detail" },
   fileByKeyDownload: { method: "get", path: "/files-by-key/download" },
@@ -33,8 +34,22 @@ export const API_CLIENT_ROUTES = {
   legacyFileDownload: { method: "get", path: "/files/{key}/download" },
   legacyFilePreview: { method: "get", path: "/files/{key}/preview" },
   fileStats: { method: "get", path: "/files/stats" },
-  uploadActivity: { method: "get", path: "/files/stats/activity" },
   health: { method: "get", path: "/health" },
+  models: { method: "get", path: "/models" },
+  projects: { method: "get", path: "/projects" },
+  project: { method: "get", path: "/projects/{slug}" },
+  assets: { method: "get", path: "/projects/{slug}/assets" },
+  prelabelRuns: { method: "get", path: "/projects/{slug}/prelabel-runs" },
+  releases: { method: "get", path: "/projects/{slug}/releases" },
+  release: { method: "get", path: "/projects/{slug}/releases/{release}" },
+  verification: { method: "get", path: "/projects/{slug}/verification" },
+  projectUpdate: { method: "patch", path: "/projects/{slug}" },
+  projectCreate: { method: "post", path: "/projects" },
+  annotationsSync: { method: "post", path: "/projects/{slug}/annotations/sync" },
+  prelabelRunCreate: { method: "post", path: "/projects/{slug}/prelabel-runs" },
+  releaseCreate: { method: "post", path: "/projects/{slug}/releases" },
+  releaseVerify: { method: "post", path: "/projects/{slug}/releases/{release}/verify" },
+  projectSync: { method: "post", path: "/projects/{slug}/sync" },
   uploadPresign: { method: "post", path: "/upload/presign" },
   uploadVerify: { method: "post", path: "/upload/verify" },
 } as const satisfies Record<string, ApiClientRoute>;

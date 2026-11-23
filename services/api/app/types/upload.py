@@ -26,8 +26,9 @@ class FileUploadResponse(ResponseModel):
 
 
 class PresignUploadRequest(BaseModel):
-    """What the browser declares before uploading directly to B2."""
+    """What the browser declares before uploading a raw image directly to B2."""
 
+    project: str = Field(description="Labeling project slug; the key lands in its raw prefix.")
     filename: str
     content_type: str
     size_bytes: int

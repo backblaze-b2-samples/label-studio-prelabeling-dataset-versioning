@@ -5,8 +5,9 @@
 // Run via pnpm:  pnpm run setup  (`pnpm setup` is a built-in pnpm command
 //                before pnpm 11, so the bare form would not run this script)
 
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +25,15 @@ const ENV_FILE = resolve(REPO_ROOT, ".env");
 const VENV_DIR = resolve(API_DIR, ".venv");
 const VENV_PYTHON = resolve(VENV_DIR, "bin/python");
 const REQUIREMENTS_LOCK = resolve(API_DIR, "requirements.lock");
+const ML_DIR = resolve(REPO_ROOT, "services/ml-backend");
+const ML_VENV_PYTHON = resolve(ML_DIR, ".venv/bin/python");
+const ML_TEST_REQUIREMENTS = resolve(ML_DIR, "requirements-test.txt");
+
+/** Local-only secrets docker compose needs; generated once, never printed. */
+const GENERATED_SECRETS = {
+  LABEL_STUDIO_API_TOKEN: () => randomBytes(20).toString("hex"),
+  LABEL_STUDIO_PASSWORD: () => randomBytes(18).toString("base64url"),
+};
 
 function fail(message) {
   console.error(`setup: ${message}`);
@@ -67,6 +77,27 @@ function ensureEnvFile() {
 
   copyFileSync(ENV_EXAMPLE, ENV_FILE);
   console.log("OK copied .env.example to .env; fill in your B2 credentials next");
+}
+
+function ensureLabelStudioSecrets() {
+  const lines = readFileSync(ENV_FILE, "utf8").split("\n");
+  const generated = [];
+
+  for (const [name, make] of Object.entries(GENERATED_SECRETS)) {
+    const index = lines.findIndex((line) => line.trim().startsWith(`${name}=`));
+    if (index !== -1 && lines[index].trim().slice(name.length + 1).trim() !== "") continue;
+    const entry = `${name}=${make()}`;
+    if (index === -1) lines.push(entry);
+    else lines[index] = entry;
+    generated.push(name);
+  }
+
+  if (generated.length === 0) {
+    console.log("OK Label Studio token and password already set in .env");
+    return;
+  }
+  writeFileSync(ENV_FILE, lines.join("\n"), { mode: 0o600 });
+  console.log(`OK generated ${generated.join(", ")} in .env (values not shown)`);
 }
 
 function resolveVenvPython() {
@@ -119,11 +150,19 @@ function main() {
   // blocks package downloads still leaves a usable .env to fill in instead of
   // exiting before it is created.
   ensureEnvFile();
+  ensureLabelStudioSecrets();
   run("pnpm", ["install", "--frozen-lockfile"], REPO_ROOT);
   ensureVenv(pythonBin);
   run(VENV_PYTHON, ["-m", "pip", "install", "-r", REQUIREMENTS_LOCK], API_DIR);
+  // The ML backend runs in docker compose; this light venv (no torch) is only
+  // for its unit tests (`pnpm test:ml`).
+  if (!existsSync(ML_VENV_PYTHON)) run(VENV_PYTHON, ["-m", "venv", ".venv"], ML_DIR);
+  run(ML_VENV_PYTHON, ["-m", "pip", "install", "-r", ML_TEST_REQUIREMENTS], ML_DIR);
 
-  console.log("\nSetup complete. Run `pnpm run doctor` to validate credentials and local server access.");
+  console.log(
+    "\nSetup complete. Fill in your B2 credentials in .env, then `docker compose up -d` " +
+      "(Label Studio + ML backend) and `pnpm run doctor`.",
+  );
 }
 
 main();

@@ -1,0 +1,12 @@
+# ML backend runtime. Exact pins: torch and transformers move fast, and a
+# pre-label run must be reproducible from the revision recorded on B2.
+# Verified together on 2026-11-23 (RT-DETR R18 loads and runs on CPU).
+# The Dockerfile installs torch from the CPU-only wheel index first.
+torch==2.15.0
+transformers==5.24.0
+safetensors==0.8.0
+pillow==13.0.0
+numpy==2.5.5
+fastapi==0.165.0
+uvicorn==0.54.0
+boto3==1.44.10

@@ -18,8 +18,6 @@ packages/shared/   Shared TypeScript types, generated from the API contract
 docs/              System of record (features, workflows, security, reliability)
 docs/exec-plans/   Execution plans, tech debt, and sample.json (the gen:docs input)
 scripts/gen/       Generator policy: API naming, sample-manifest schema
-infra/vercel/      Vercel deployment contract
-infra/railway/     Railway delivery contract (per-service railway.json at their service roots)
 ```
 <!-- gen:end agents-repo-map -->
 
@@ -30,12 +28,14 @@ These pieces are shared scaffolding rather than app-specific code: keep them, an
 **Keep as-is (do not strip, rename, or replace)**
 - **UI kit / design system.** `apps/web/src/components/ui/` (shadcn primitives), the design tokens in `apps/web/src/app/globals.css`, and the `/design` reference page. Build new screens with these primitives; never edit the generated `components/ui/` files directly. Restyling happens through tokens in `globals.css`.
 - **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
-- **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays.
-- The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
+- **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays (here it uploads raw images into a project's `labeling/raw/<slug>/`).
+- The sidebar nav itself (Dashboard, Projects, Library, Upload, Files, Settings, plus the Design System utility link).
 
 **Adapt to this app**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what this app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, recent releases) reflect the annotation loop. New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`, and no hand-added `qk` entry: query keys come from `pnpm gen:api`.
 - Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
+
+**This sample's own surface** — `/projects` (the `LabelingProject` lifecycle: create, read, edit, delete, run), `/library` (assets under `labeling/`), `services/ml-backend/` (the Label Studio ML backend) and `docker-compose.yml` (Label Studio 1.23.2 + the ML backend). Label Studio talks to B2 through its own S3 storages; never add a proxy or patch between them. Every B2 key under `labeling/` is built by `services/api/app/service/keys.py`.
 
 **Why this contract exists** — the UI kit, Files, and Upload pages are the reusable B2-backed scaffolding; stripping them costs the app its whole storage surface. The dashboard is the one screen designed to be rewritten per app.
 
@@ -44,7 +44,7 @@ These pieces are shared scaffolding rather than app-specific code: keep them, an
 **Backend layering**: `types` -> `config` -> `repo` -> `service` -> `runtime`
 
 - No backward imports across layers
-- No `boto3` outside `repo/`
+- No `boto3` or `httpx` outside `repo/` (Label Studio, the ML backend and Commons downloads are repo adapters)
 - No business logic in route handlers (`runtime/`)
 - All external APIs wrapped in `repo/` adapters
 - All request/response data validated at boundary (Pydantic models)
@@ -225,8 +225,6 @@ If documentation and implementation conflict, update docs in the same PR. Docume
 | The API contract itself | [docs/api/openapi.json](docs/api/openapi.json) |
 | Execution plans | [docs/exec-plans/](docs/exec-plans/) |
 | Tech debt | [docs/exec-plans/tech-debt-tracker.md](docs/exec-plans/tech-debt-tracker.md) |
-| Deploying to vercel | [infra/vercel/README.md](infra/vercel/README.md) |
-| Deploying to railway | [infra/railway/README.md](infra/railway/README.md) |
 <!-- gen:end agents-doc-map -->
 
 ## 11. When Unsure

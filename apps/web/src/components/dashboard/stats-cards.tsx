@@ -1,67 +1,75 @@
 "use client";
 
-import { FileIcon, HardDrive, Upload, Download } from "lucide-react";
+import { CheckSquare, ListTodo, PackageCheck, Tags } from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingNotice } from "@/components/common/loading-notice";
-import { useFileStats } from "@/lib/queries";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectDetails, useProjects } from "@/lib/queries";
+
+/** Annotated share as a whole percent; "—" while there are no tasks. */
+export function annotatedPercent(annotated: number, tasks: number): string {
+  return tasks > 0 ? `${Math.round((annotated / tasks) * 100)}%` : "—";
+}
 
 export function StatsCards() {
-  const { data: stats, isLoading, error, refetch } = useFileStats();
+  const projects = useProjects();
+  const slugs = (projects.data ?? []).map((p) => p.slug);
+  const details = useProjectDetails(slugs);
 
-  // Surface fetch failures inline rather than rendering "0 files / 0 B" —
-  // that lies to the user about the bucket state when really the API is
-  // just unreachable.
-  if (error) {
+  if (projects.error) {
     return (
       <Card>
         <CardContent className="p-0">
-          <ErrorState error={error} onRetry={() => refetch()} />
+          <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
         </CardContent>
       </Card>
     );
   }
 
+  const loading = projects.isLoading || details.some((d) => d.isLoading);
+  const counts = details.flatMap((d) => (d.data ? [d.data.counts] : []));
+  const tasks = counts.reduce((sum, c) => sum + c.tasks, 0);
+  const annotated = counts.reduce((sum, c) => sum + c.annotated_tasks, 0);
+  const releases = counts.reduce((sum, c) => sum + c.releases, 0);
+  const failed = details.filter((d) => d.error).length;
+
   const cards = [
-    { title: "Total Files", value: stats?.total_files ?? 0, icon: FileIcon },
-    { title: "Storage Used", value: stats?.total_size_human ?? "0 B", icon: HardDrive },
-    { title: "Uploads Today", value: stats?.uploads_today ?? 0, icon: Upload },
-    { title: "Total Downloads", value: stats?.total_downloads ?? 0, icon: Download },
+    { title: "Projects", value: slugs.length, icon: Tags, hint: null },
+    { title: "Tasks", value: tasks, icon: ListTodo, hint: null },
+    { title: "Annotated tasks", value: annotated, icon: CheckSquare, hint: annotatedPercent(annotated, tasks) },
+    { title: "Releases", value: releases, icon: PackageCheck, hint: null },
   ];
 
   return (
-    <>
-      {/* Stats need a full bucket listing, which measured ~8s on a 16k-object
-          bucket. Four blank skeleton cards said nothing about that; this states
-          it in words and escalates if the wait keeps going. */}
-      {isLoading && (
-        <LoadingNotice className="mb-3" subject="bucket stats" />
-      )}
+    <div className="space-y-2">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, i) => (
-          <Card
-            key={card.title}
-            className={`card-hover animate-fade-in-up stagger-${i + 1}`}
-          >
-            <CardHeader className="flex flex-row items-center justify-between pt-4 pb-2 px-4 space-y-0">
-              <CardTitle className="text-xs font-semibold text-muted-foreground">
-                {card.title}
-              </CardTitle>
+          <Card key={card.title} className={`card-hover animate-fade-in-up stagger-${i + 1}`}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-2">
+              <CardTitle className="text-xs font-semibold text-muted-foreground">{card.title}</CardTitle>
               <div className="stat-icon-wrap">
                 <card.icon className="h-4 w-4" />
               </div>
             </CardHeader>
-            <CardContent className="pb-5 px-4">
-              {isLoading ? (
+            <CardContent className="px-4 pb-5">
+              {loading ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                <div className="stat-value">{card.value}</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="stat-value">{card.value}</span>
+                  {card.hint && <span className="text-sm text-muted-foreground">{card.hint}</span>}
+                </div>
               )}
             </CardContent>
           </Card>
         ))}
       </div>
-    </>
+      {failed > 0 && (
+        <p role="alert" className="text-xs text-[var(--attention)]">
+          {failed} project(s) could not be read (is Label Studio running?), so totals are partial.
+        </p>
+      )}
+    </div>
   );
 }

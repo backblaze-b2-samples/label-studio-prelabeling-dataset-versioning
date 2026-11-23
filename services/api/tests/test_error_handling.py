@@ -98,7 +98,7 @@ async def test_upload_empty_file_returns_400(client):
     """Presigning an empty upload returns 400 with explanation."""
     response = await client.post(
         "/upload/presign",
-        json={"filename": "empty.txt", "content_type": "text/plain", "size_bytes": 0},
+        json={"project": "street", "filename": "empty.jpg", "content_type": "image/jpeg", "size_bytes": 0},
     )
     assert response.status_code == 400
     assert "empty" in response.json()["detail"].lower()

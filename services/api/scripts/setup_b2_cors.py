@@ -1,20 +1,23 @@
-"""Add a web origin to the B2 bucket's CORS so the browser can upload directly.
+"""Set the B2 bucket CORS rules this sample needs. Dry run unless --apply.
 
-The direct-to-B2 upload flow has the browser PUT bytes straight to the bucket,
-so the bucket must allow your web origin (method PUT + the `content-type`
-header). Local dev origins are typically already allowed; run this once per
-deployed origin (your Vercel/production URL).
+Two rules, merged into whatever the bucket already has:
+
+1. `<app slug>-direct-upload` — the web app's origin(s): the browser PUTs raw
+   images straight to the bucket (method PUT + the `content-type` header) and
+   previews objects with presigned GETs.
+2. `<app slug>-label-studio` — the Label Studio origin (`LABEL_STUDIO_URL`,
+   default http://localhost:8080) for GET/HEAD only: the labeling UI loads each
+   task image from a presigned B2 URL.
 
 Usage:
     # dry run (default): print current + proposed CORS, write nothing
-    python services/api/scripts/setup_b2_cors.py --origin https://your-app.vercel.app
+    python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000
 
     # actually write it
-    python services/api/scripts/setup_b2_cors.py --origin https://your-app.vercel.app --apply
+    python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply
 
-Reads B2 credentials from the repo-root .env exactly like the app. It MERGES:
-existing CORS rules are preserved and one rule (ID `<app slug>-direct-upload`) is
-added/updated for the given origins. Never prints credentials.
+Reads B2 credentials from the repo-root .env exactly like the app. Existing
+rules with other IDs are preserved. Never prints credentials.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ if str(API_ROOT) not in sys.path:
 from app.config import settings  # noqa: E402
 
 RULE_ID = f"{settings.app_slug}-direct-upload"
+LS_RULE_ID = f"{settings.app_slug}-label-studio"
 
 
 def out(message: str) -> None:
@@ -57,7 +61,7 @@ def _client():
         region_name=settings.b2_region,
         aws_access_key_id=settings.b2_application_key_id,
         aws_secret_access_key=settings.b2_application_key,
-        config=Config(signature_version="s3v4", user_agent_extra="b2ai-oss-start"),
+        config=Config(signature_version="s3v4", user_agent_extra="b2ai-label-studio-annotation-loop"),
     )
 
 
@@ -79,7 +83,13 @@ def main() -> int:
         action="append",
         required=True,
         metavar="URL",
-        help="Web origin to allow, e.g. https://your-app.vercel.app (repeatable)",
+        help="Web origin to allow, e.g. http://localhost:3000 (repeatable)",
+    )
+    parser.add_argument(
+        "--label-studio-origin",
+        default=settings.label_studio_url.rstrip("/"),
+        metavar="URL",
+        help="Label Studio origin allowed to GET/HEAD task images (default: LABEL_STUDIO_URL)",
     )
     parser.add_argument(
         "--apply",
@@ -88,7 +98,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    for origin in args.origin:
+    for origin in [*args.origin, args.label_studio_origin]:
         if "://" not in origin or origin.endswith("/"):
             parser.error(f"origin must be scheme://host with no trailing slash: {origin!r}")
 
@@ -106,13 +116,22 @@ def main() -> int:
         "ExposeHeaders": ["etag"],
         "MaxAgeSeconds": 3600,
     }
+    ls_rule = {
+        "ID": LS_RULE_ID,
+        "AllowedOrigins": [args.label_studio_origin],
+        "AllowedMethods": ["GET", "HEAD"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["etag"],
+        "MaxAgeSeconds": 3600,
+    }
     # Preserve every other app's rules; replace only our own by ID.
-    merged = [r for r in current if r.get("ID") != RULE_ID] + [our_rule]
+    ours = {RULE_ID, LS_RULE_ID}
+    merged = [r for r in current if r.get("ID") not in ours] + [our_rule, ls_rule]
 
     out(f"Bucket: {settings.b2_bucket_name}")
     out(f"Current CORS rules: {len(current)}")
-    out("Proposed rule (merged in):")
-    out(json.dumps(our_rule, indent=2))
+    out("Proposed rules (merged in):")
+    out(json.dumps([our_rule, ls_rule], indent=2))
 
     if not args.apply:
         out("\nDry run — re-run with --apply to write this change.")

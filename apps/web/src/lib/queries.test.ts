@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it } from "vitest";
-import { dropDeletedFileFromCache, qk } from "@/lib/queries";
-import type { FileMetadata } from "@vibe-coding-starter-kit/shared";
+import { dropDeletedFileFromCache, projectKeys, qk } from "@/lib/queries";
+import type { FileMetadata } from "@label-studio-prelabeling-dataset-versioning/shared";
 
 function file(key: string): FileMetadata {
   return {
@@ -67,14 +67,14 @@ describe("dropDeletedFileFromCache", () => {
     });
   });
 
-  it("does not touch stats or activity caches", () => {
+  it("does not touch stats or project caches", () => {
     qc.setQueryData(qk.stats(), { total_files: 2 });
-    qc.setQueryData(qk.uploadActivity(7), [{ date: "2026-07-28", uploads: 2 }]);
+    qc.setQueryData(projectKeys.detail("street"), { counts: { tasks: 3 } });
 
     dropDeletedFileFromCache(qc, "uploads/a.txt");
 
     expect(qc.getQueryData(qk.stats())).toEqual({ total_files: 2 });
-    expect(qc.getQueryData(qk.uploadActivity(7))).toHaveLength(1);
+    expect(qc.getQueryData(projectKeys.detail("street"))).toEqual({ counts: { tasks: 3 } });
   });
 
   it("is a no-op for an unseeded cache", () => {
@@ -82,5 +82,29 @@ describe("dropDeletedFileFromCache", () => {
       dropDeletedFileFromCache(qc, "uploads/missing.txt"),
     ).not.toThrow();
     expect(qc.getQueryData(qk.files())).toBeUndefined();
+  });
+});
+
+describe("projectKeys", () => {
+  it("scopes every project key by slug under qk.projects()", () => {
+    const root = qk.projects();
+    for (const key of [
+      projectKeys.detail("a"),
+      projectKeys.runs("a"),
+      projectKeys.releases("a"),
+      projectKeys.verification("a"),
+      projectKeys.assets("a", "raw"),
+    ]) {
+      expect(key.slice(0, root.length)).toEqual([...root]);
+      expect(key.at(-1)).toBe("a");
+    }
+    expect(projectKeys.detail("a")).not.toEqual(projectKeys.detail("b"));
+  });
+
+  it("invalidating qk.projects() reaches a project's detail", async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(projectKeys.detail("a"), { ok: true });
+    await qc.invalidateQueries({ queryKey: qk.projects() });
+    expect(qc.getQueryState(projectKeys.detail("a"))?.isInvalidated).toBe(true);
   });
 });

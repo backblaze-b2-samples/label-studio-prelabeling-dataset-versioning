@@ -217,9 +217,43 @@ function checkEnv() {
   if (placeholders.length > 0) {
     fail(
       `.env still has placeholder values: ${placeholders.join(", ")}`,
-      "Edit .env and replace placeholders with your real B2 credentials (https://secure.backblaze.com/app_keys.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)",
+      "Edit .env and replace placeholders with your real B2 credentials (https://secure.backblaze.com/app_keys.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-label-studio-annotation-loop)",
     );
   }
+}
+
+function checkLabelStudioSecrets() {
+  if (!existsSync(ENV_FILE)) return;
+  const env = parseEnvFile(ENV_FILE);
+  const missing = ["LABEL_STUDIO_API_TOKEN", "LABEL_STUDIO_PASSWORD"].filter((k) => !env[k]);
+  if (missing.length > 0) {
+    fail(
+      `.env has no ${missing.join(" / ")} (docker compose and the API both need them)`,
+      "Run: `pnpm run setup` — it generates them without printing them",
+    );
+  }
+}
+
+/** Label Studio and the ML backend run in docker compose; warn, never fail. */
+async function checkCompanionServices() {
+  const env = existsSync(ENV_FILE) ? parseEnvFile(ENV_FILE) : {};
+  const services = [
+    { name: "Label Studio", url: `${env.LABEL_STUDIO_URL || "http://localhost:8080"}/health` },
+    { name: "ML backend", url: `${env.ML_BACKEND_URL || "http://localhost:9090"}/health` },
+  ];
+  await Promise.all(
+    services.map(async ({ name, url }) => {
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
+        if (!response.ok) throw new Error(String(response.status));
+      } catch {
+        warn(
+          `${name} is not answering at ${url}`,
+          "Start it with `docker compose up -d` (first start pulls images and the model; give it a minute). The bucket explorer works without it.",
+        );
+      }
+    }),
+  );
 }
 
 // ----- Network -----
@@ -286,7 +320,8 @@ async function main() {
   checkPython();
   checkVenv();
   checkEnv();
-  await Promise.all(PORTS_TO_CHECK.map(checkPort));
+  checkLabelStudioSecrets();
+  await Promise.all([...PORTS_TO_CHECK.map(checkPort), checkCompanionServices()]);
 
   if (failures.length === 0 && warnings.length === 0) {
     console.log("✓ doctor: environment looks good");

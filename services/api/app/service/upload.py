@@ -10,96 +10,33 @@ from app.repo import (
     get_object_head_bytes,
     invalidate_listing,
 )
+from app.service import descriptors, keys
 from app.service.files import FileKeyError, validate_key
 from app.types import FileUploadResponse, PresignUploadResponse
 from app.types.formatting import humanize_bytes
 
-# Note: image/svg+xml is deliberately excluded. SVGs can embed <script>, so a
-# file stored and later served from a public bucket URL would execute in the
-# browser (stored XSS). Re-add only with server-side SVG sanitization.
-ALLOWED_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "application/pdf",
-    "text/plain",
-    "text/csv",
-    "application/json",
-    "application/zip",
-    "video/mp4",
-    "audio/mpeg",
-    "audio/wav",
-    # Text / data formats common in the sample apps built on this kit
-    # (markdown docs, configs, datasets, tabular/structured exports).
-    "text/markdown",
-    "application/yaml",
-    "application/x-yaml",
-    "application/x-ndjson",
-    "text/tab-separated-values",
-    "application/xml",
-    "text/xml",
-    # Office documents (OOXML) for document-ingestion / RAG samples.
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    # Additional video containers (mp4 already above).
-    "video/quicktime",
-    "video/webm",
-}
-
-_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+# Raw images for labeling only. Label Studio's source storage imports exactly
+# these extensions (see keys.IMAGE_REGEX_FILTER), so accepting anything else
+# would upload objects that never become tasks. SVG stays excluded: it can
+# embed <script> (stored XSS when served from a public bucket).
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 MIME_EXTENSION_MAP: dict[str, set[str]] = {
-    "image/jpeg": {"jpg", "jpeg", "jfif"},
+    "image/jpeg": {"jpg", "jpeg"},
     "image/png": {"png"},
-    "image/gif": {"gif"},
     "image/webp": {"webp"},
-    "application/pdf": {"pdf"},
-    "text/plain": {"txt", "text", "log", "md"},
-    "text/csv": {"csv"},
-    "application/json": {"json"},
-    "application/zip": {"zip"},
-    "video/mp4": {"mp4"},
-    "audio/mpeg": {"mp3", "mpeg"},
-    "audio/wav": {"wav"},
-    "text/markdown": {"md", "markdown"},
-    "application/yaml": {"yaml", "yml"},
-    "application/x-yaml": {"yaml", "yml"},
-    "application/x-ndjson": {"jsonl", "ndjson"},
-    "text/tab-separated-values": {"tsv"},
-    "application/xml": {"xml"},
-    "text/xml": {"xml"},
-    _DOCX: {"docx"},
-    _XLSX: {"xlsx"},
-    _PPTX: {"pptx"},
-    "video/quicktime": {"mov"},
-    "video/webm": {"webm"},
 }
 
 # Magic-byte signatures for the binary types we accept. The client-declared
 # content_type is untrusted, so we sniff the leading bytes and reject obvious
-# mismatches (e.g. an HTML/script payload uploaded as image/png). Text-like
-# types (text/plain, text/csv, application/json) and the OOXML/container types
-# have no reliable leading signature and are intentionally absent — they skip
-# this check but remain constrained by the extension/type consistency check.
-# This dict is the single source of truth for BOTH the check and
+# mismatches (e.g. an HTML/script payload uploaded as image/png). Every
+# accepted type has a signature. This dict is the single source of truth for BOTH the check and
 # `content_type_has_signature()`, so the verify path never fetches header bytes
 # for a type it wouldn't inspect.
 _CONTENT_SIGNATURES: dict[str, Callable[[bytes], bool]] = {
     "image/jpeg": lambda d: d[:3] == b"\xff\xd8\xff",
     "image/png": lambda d: d[:8] == b"\x89PNG\r\n\x1a\n",
-    "image/gif": lambda d: d[:6] in (b"GIF87a", b"GIF89a"),
     "image/webp": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WEBP",
-    "application/pdf": lambda d: d[:5] == b"%PDF-",
-    "application/zip": lambda d: d[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
-    "video/mp4": lambda d: d[4:8] == b"ftyp",  # ISO base media 'ftyp' box
-    # ID3 tag, or an MPEG audio frame sync (11 set bits).
-    "audio/mpeg": lambda d: d[:3] == b"ID3"
-    or (len(d) >= 2 and d[0] == 0xFF and (d[1] & 0xE0) == 0xE0),
-    "audio/wav": lambda d: d[:4] == b"RIFF" and d[8:12] == b"WAVE",
 }
 
 
@@ -161,20 +98,24 @@ class UploadError(Exception):
         super().__init__(detail)
 
 
-# Every object the app writes lives under this prefix; the API mints the key so
-# the client never chooses where its bytes land.
-UPLOAD_PREFIX = "uploads/"
+# Browser uploads land in a project's raw prefix; the API mints the key so the
+# client never chooses where its bytes land.
+UPLOAD_PREFIX = f"{keys.ROOT}raw/"
 # Leading bytes fetched for the post-upload sniff. The deepest signature check
 # reads data[8:12]; 512 leaves generous headroom for any future signature.
 _SNIFF_BYTES = 512
 
 
-def _validate_declared(filename: str, content_type: str, size_bytes: int) -> str:
+def _validate_declared(project: str, filename: str, content_type: str, size_bytes: int) -> str:
     """Validate a *declared* upload (pre-bytes) and return the key it may write.
 
     Runs at presign time and applies the same allow-list / extension / size
     rules the old proxy applied to the bytes. Raises UploadError on failure.
     """
+    try:
+        keys.validate_project_slug(project)
+    except keys.KeyLayoutError as e:
+        raise UploadError(str(e)) from None
     if not filename:
         raise UploadError("No filename provided")
     if size_bytes <= 0:
@@ -194,11 +135,11 @@ def _validate_declared(filename: str, content_type: str, size_bytes: int) -> str
             "File extension does not match declared content type",
             status_code=415,
         )
-    return f"{UPLOAD_PREFIX}{safe_name}"
+    return keys.raw_key(project, safe_name)
 
 
 def create_presigned_upload(
-    filename: str, content_type: str, size_bytes: int
+    project: str, filename: str, content_type: str, size_bytes: int
 ) -> PresignUploadResponse:
     """Validate a declared upload and return a presigned PUT for direct-to-B2.
 
@@ -206,7 +147,9 @@ def create_presigned_upload(
     body of a different size or type — the size/type guarantees survive even
     though the bytes never reach the API. Raises UploadError on failure.
     """
-    key = _validate_declared(filename, content_type, size_bytes)
+    key = _validate_declared(project, filename, content_type, size_bytes)
+    if not descriptors.exists(project):
+        raise UploadError(f"Project '{project}' not found", status_code=404)
     expires_in = settings.presign_upload_expiry_seconds
     url = generate_presigned_upload(key, content_type, size_bytes, expires_in)
     return PresignUploadResponse(
@@ -237,7 +180,7 @@ def verify_upload(key: str) -> FileUploadResponse:
     Enabling quarantine→promote (see the design plan) closes that window.
     """
     if not key.startswith(UPLOAD_PREFIX):
-        raise UploadError("Upload key must be under the uploads/ prefix")
+        raise UploadError(f"Upload key must be under the {UPLOAD_PREFIX} prefix")
     try:
         validate_key(key)
     except FileKeyError as e:

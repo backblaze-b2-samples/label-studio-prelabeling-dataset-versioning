@@ -1,85 +1,56 @@
 {
   "$schema": "../../scripts/gen/sample.schema.json",
   "schema_version": 1,
-  "name": "Vibe Coding Starter Kit",
-  "slug": "vibe-coding-starter-kit",
-  "package_scope": "@vibe-coding-starter-kit",
-  "purpose": "A well-engineered full-stack foundation — dashboard, drag-and-drop upload and a file browser — with Backblaze B2 storage already wired in, so builders skip the boilerplate loop.",
-  "tagline": "Stop wiring boilerplate and start building.",
-  "primary_entity": { "schema": "FileMetadata", "singular": "file", "plural": "files" },
+  "name": "Label Studio Prelabeling Dataset Versioning",
+  "slug": "label-studio-prelabeling-dataset-versioning",
+  "package_scope": "@label-studio-prelabeling-dataset-versioning",
+  "purpose": "Connects Label Studio to Backblaze B2 as source and target storage, pre-labels tasks with a local model, and exports versioned, verified dataset releases back to the same bucket.",
+  "tagline": "Pre-label, correct and release datasets with Label Studio on B2.",
+  "primary_entity": { "schema": "LabelingProject", "singular": "labeling project", "plural": "labeling projects" },
   "features": [
-    {
-      "title": "File Upload",
-      "route": "/upload",
-      "doc": "docs/features/file-upload.md",
-      "summary": "drag-and-drop upload with real-time progress",
-      "workflow_heading": "Upload Files"
-    },
-    {
-      "title": "File Browser",
-      "route": "/files",
-      "doc": "docs/features/file-browser.md",
-      "summary": "list, preview, download, delete files",
-      "workflow_heading": "Browse and Manage Files"
-    },
-    {
-      "title": "Dashboard",
-      "route": "/",
-      "doc": "docs/features/dashboard.md",
-      "summary": "stats cards, upload chart, recent uploads",
-      "workflow_heading": "View Dashboard"
-    },
-    {
-      "title": "Metadata Extraction",
-      "route": null,
-      "doc": "docs/features/metadata-extraction.md",
-      "summary": "image dimensions, EXIF, PDF info, checksums"
-    },
-    {
-      "title": "Settings",
-      "route": "/settings",
-      "doc": "docs/features/settings.md",
-      "summary": "theme plus labelled demo preference fields",
-      "workflow_heading": "Change Preferences"
-    }
+    { "title": "Labeling Projects", "route": "/projects", "doc": "docs/features/labeling-projects.md", "summary": "create, edit, delete and run projects bound to Label Studio source and target storage on B2", "workflow_heading": "Set Up a Labeling Project" },
+    { "title": "Pre-label Runs", "route": null, "doc": "docs/features/prelabel-runs.md", "summary": "local object detector writes versioned suggestions to B2 and into Label Studio", "workflow_heading": "Pre-label Tasks" },
+    { "title": "Dataset Releases", "route": null, "doc": "docs/features/dataset-releases.md", "summary": "immutable COCO releases with a manifest, written back to B2", "workflow_heading": "Cut a Dataset Release" },
+    { "title": "Verification", "route": null, "doc": "docs/features/verification.md", "summary": "compare tasks, pre-labels, annotations and release files, and flag missing labels", "workflow_heading": "Verify a Project or Release" },
+    { "title": "Dataset Library", "route": "/library", "doc": "docs/features/dataset-library.md", "summary": "browse raw images, pre-label runs, annotations and releases per project", "workflow_heading": "Browse the Dataset Library" },
+    { "title": "Raw Image Upload", "route": "/upload", "doc": "docs/features/file-upload.md", "summary": "upload raw images straight to a project's B2 prefix", "workflow_heading": "Upload Raw Images" },
+    { "title": "File Browser", "route": "/files", "doc": "docs/features/file-browser.md", "summary": "browse, preview, download and delete any object in the bucket", "workflow_heading": "Browse the Bucket" },
+    { "title": "Dashboard", "route": "/", "doc": "docs/features/dashboard.md", "summary": "projects, tasks, annotated tasks, releases and recent releases", "workflow_heading": "View Dashboard" },
+    { "title": "Settings", "route": "/settings", "doc": "docs/features/settings.md", "summary": "theme, default pre-label threshold and service status", "workflow_heading": "Change Preferences" },
+    { "title": "Metadata Extraction", "route": null, "doc": "docs/features/metadata-extraction.md", "summary": "image dimensions, EXIF and checksums in the bucket explorer" },
+    { "title": "Label Studio Stack", "route": null, "doc": "docs/features/label-studio-stack.md", "summary": "Docker Compose with Label Studio and the ML backend" }
   ],
   "b2_surface": [
-    { "operation": "put_object", "why": "store an uploaded object" },
-    { "operation": "presigned PUT", "why": "the browser uploads bytes directly to B2, bypassing the Function payload cap" },
-    { "operation": "list_objects_v2", "why": "the shared full-bucket listing behind the file list and the stats cards" },
-    { "operation": "head_object", "why": "cheap per-key metadata, and the /health connectivity probe" },
-    { "operation": "get_object", "why": "re-read bytes to recompute rich metadata on demand" },
-    { "operation": "presigned GET", "why": "download and inline preview URLs" },
-    { "operation": "delete_object", "why": "remove an object" }
+    { "operation": "list_objects_v2", "why": "count raw images, list pre-label runs, annotations and release files; Label Studio source sync" },
+    { "operation": "get_object", "why": "read annotation JSON for the COCO build and verification; the ML backend reads task images" },
+    { "operation": "put_object", "why": "write pre-labels, release files and project descriptors; Label Studio target storage writes annotations" },
+    { "operation": "head_object", "why": "release immutability check, file checks in verification, and the /health probe" },
+    { "operation": "presigned PUT", "why": "the browser uploads raw images straight to B2" },
+    { "operation": "presigned GET", "why": "downloads and previews; Label Studio shows task images" },
+    { "operation": "delete_object", "why": "bucket explorer delete and the optional purge of a project's B2 data" }
   ],
-  "b2_key_prefix": "uploads/",
+  "b2_key_prefix": "labeling/",
   "stack": {
-    "web": "Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query, Recharts",
-    "api": "FastAPI, Python 3.12+, boto3, Pydantic v2, Pillow, pypdf",
+    "web": "Next.js 16, React 19, Tailwind v4, shadcn/ui, TanStack Query",
+    "api": "FastAPI, Python 3.12+, boto3, httpx, Pydantic v2, Pillow",
     "storage": "Backblaze B2 (S3-compatible API)",
     "package_manager": "pnpm workspaces"
   },
-  "deployment_targets": ["vercel", "railway"],
+  "deployment_targets": [],
   "env_vars": [
     { "name": "B2_APPLICATION_KEY_ID", "required": true, "secret": true, "note": "B2 application key ID (**keyID** in the B2 console)" },
-    { "name": "B2_APPLICATION_KEY", "required": true, "secret": true, "note": "B2 application key (**applicationKey**) — shown once at creation" },
+    { "name": "B2_APPLICATION_KEY", "required": true, "secret": true, "note": "B2 application key (**applicationKey**), shown once at creation" },
     { "name": "B2_BUCKET_NAME", "required": true, "secret": false, "note": "bucket unique name (**Bucket Unique Name** in the B2 console)" },
     { "name": "B2_REGION", "required": true, "secret": false, "note": "the region inside the bucket's **Endpoint** (`s3.<region>.backblazeb2.com`); the S3 endpoint is derived from it" },
     { "name": "B2_PUBLIC_URL_BASE", "required": false, "secret": false, "note": "public object base URL, when the bucket is public" },
+    { "name": "LABEL_STUDIO_URL", "required": false, "secret": false, "note": "Label Studio base URL; defaults to http://localhost:8080" },
+    { "name": "LABEL_STUDIO_API_TOKEN", "required": true, "secret": true, "note": "API token for the bootstrap admin; `pnpm setup` generates it and Docker Compose passes it to Label Studio" },
+    { "name": "LABEL_STUDIO_USERNAME", "required": false, "secret": false, "note": "local bootstrap admin email for Label Studio" },
+    { "name": "LABEL_STUDIO_PASSWORD", "required": false, "secret": true, "note": "local bootstrap admin password for Label Studio" },
+    { "name": "ML_BACKEND_URL", "required": false, "secret": false, "note": "ML backend base URL as the API reaches it; defaults to http://localhost:9090" },
     { "name": "NEXT_PUBLIC_API_URL", "required": false, "secret": false, "note": "separate-origin deploys only; Next.js inlines it at build time" }
   ],
-  "attribution_token": "b2ai-oss-start",
-  "repo": { "org": "backblaze-b2-samples", "name": "vibe-coding-starter-kit" },
-  "screenshots": [
-    {
-      "path": "docs/images/b2-starterkit-dashboard1.png",
-      "alt": "Dashboard view showing stat cards, upload activity chart, and recent uploads table",
-      "caption": "**Dashboard** — stats, upload activity, and recent uploads at a glance:"
-    },
-    {
-      "path": "docs/images/b2-starterkit-fileview2.png",
-      "alt": "File browser view showing a tree of files with hover actions",
-      "caption": "**File browser** — tree view with preview, download, and delete:"
-    }
-  ]
+  "attribution_token": "b2ai-label-studio-annotation-loop",
+  "repo": { "org": "backblaze-b2-samples", "name": "label-studio-prelabeling-dataset-versioning" },
+  "screenshots": []
 }

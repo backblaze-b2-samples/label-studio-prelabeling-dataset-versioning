@@ -2,26 +2,46 @@
 
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
 import {
   ApiError,
+  createPrelabelRun,
+  createProject,
+  createRelease,
   deleteFile,
+  deleteProject,
+  getAssets,
   getDownloadUrl,
   getFileDetail,
   getFiles,
   getFileStats,
   getHealth,
+  getModels,
   getPreviewUrl,
-  getUploadActivity,
+  getPrelabelRuns,
+  getProject,
+  getProjects,
+  getReleases,
+  getVerification,
+  syncAnnotations,
+  syncProject,
+  updateProject,
+  verifyRelease,
+  type AssetKind,
 } from "@/lib/api-client";
 import type {
   FileMetadata,
   FileMetadataDetail,
   FileUrlResponse,
-} from "@vibe-coding-starter-kit/shared";
+  PrelabelRunCreate,
+  ProjectCreate,
+  ProjectUpdate,
+  ReleaseCreate,
+} from "@label-studio-prelabeling-dataset-versioning/shared";
 import { qk } from "@/lib/generated/query-keys";
 
 // Query keys are GENERATED from the API contract (`pnpm gen:api`) and their
@@ -61,13 +81,6 @@ export function useFileStats({ enabled = true }: QueryGate = {}) {
     queryKey: qk.stats(),
     queryFn: getFileStats,
     enabled,
-  });
-}
-
-export function useUploadActivity(days = 7) {
-  return useQuery({
-    queryKey: qk.uploadActivity(days),
-    queryFn: () => getUploadActivity(days),
   });
 }
 
@@ -166,5 +179,153 @@ export function useDeleteFile() {
       dropDeletedFileFromCache(qc, fileKey);
       qc.invalidateQueries({ queryKey: qk.all });
     },
+  });
+}
+
+// --- labeling projects -------------------------------------------------------
+//
+// The generator builds key parts from QUERY parameters only, so the `{slug}`
+// path parameter is appended here. Every project key starts with
+// `qk.projects()`, so invalidating that one key refreshes every project view.
+
+export const projectKeys = {
+  detail: (slug: string) => [...qk.projectDetail(), slug] as const,
+  runs: (slug: string) => [...qk.prelabelRuns(), slug] as const,
+  releases: (slug: string) => [...qk.releases(), slug] as const,
+  verification: (slug: string) => [...qk.verification(), slug] as const,
+  assets: (slug: string, kind: AssetKind, run?: string, release?: string, cursor?: string) =>
+    [...qk.assets(kind, run, release, cursor), slug] as const,
+};
+
+/** Model info rarely changes: the ML backend serves one pinned revision. */
+export function useModels() {
+  return useQuery({ queryKey: qk.models(), queryFn: getModels, staleTime: 5 * 60_000, retry: false });
+}
+
+export function useProjects() {
+  return useQuery({ queryKey: qk.projects(), queryFn: getProjects });
+}
+
+export function useProject(slug: string) {
+  return useQuery({ queryKey: projectKeys.detail(slug), queryFn: () => getProject(slug), enabled: !!slug });
+}
+
+/** Details for several projects at once (dashboard aggregates). */
+export function useProjectDetails(slugs: string[]) {
+  return useQueries({
+    queries: slugs.map((slug) => ({ queryKey: projectKeys.detail(slug), queryFn: () => getProject(slug) })),
+  });
+}
+
+export function useReleasesFor(slugs: string[]) {
+  return useQueries({
+    queries: slugs.map((slug) => ({ queryKey: projectKeys.releases(slug), queryFn: () => getReleases(slug) })),
+  });
+}
+
+export function usePrelabelRuns(slug: string) {
+  return useQuery({ queryKey: projectKeys.runs(slug), queryFn: () => getPrelabelRuns(slug), enabled: !!slug });
+}
+
+export function useReleases(slug: string) {
+  return useQuery({ queryKey: projectKeys.releases(slug), queryFn: () => getReleases(slug), enabled: !!slug });
+}
+
+/** Live verification reads B2 and Label Studio, so it is fetched on demand. */
+export function useVerification(slug: string, { enabled = true }: QueryGate = {}) {
+  return useQuery({
+    queryKey: projectKeys.verification(slug),
+    queryFn: () => getVerification(slug),
+    enabled: enabled && !!slug,
+    staleTime: 0,
+  });
+}
+
+export function useAssets(
+  slug: string,
+  kind: AssetKind,
+  options: { run?: string; release?: string; cursor?: string } = {},
+) {
+  return useQuery({
+    queryKey: projectKeys.assets(slug, kind, options.run, options.release, options.cursor),
+    queryFn: () => getAssets(slug, kind, options),
+    enabled: !!slug,
+  });
+}
+
+/** After any project action: every project view, plus the bucket views. */
+function useInvalidateProjects() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: qk.projects() });
+    qc.invalidateQueries({ queryKey: qk.stats() });
+    qc.invalidateQueries({ queryKey: [...qk.all, "files"] });
+  };
+}
+
+export function useCreateProject() {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof createProject>>, ApiError, ProjectCreate>({
+    mutationFn: createProject,
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateProject(slug: string) {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof updateProject>>, ApiError, ProjectUpdate>({
+    mutationFn: (body) => updateProject(slug, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteProject(slug: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof deleteProject>>, ApiError, { purgeB2: boolean }>({
+    mutationFn: ({ purgeB2 }) => deleteProject(slug, purgeB2),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: projectKeys.detail(slug) });
+      invalidate();
+    },
+  });
+}
+
+export function useSyncProject(slug: string) {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof syncProject>>, ApiError, void>({
+    mutationFn: () => syncProject(slug),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreatePrelabelRun(slug: string) {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof createPrelabelRun>>, ApiError, PrelabelRunCreate>({
+    mutationFn: (body) => createPrelabelRun(slug, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSyncAnnotations(slug: string) {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof syncAnnotations>>, ApiError, void>({
+    mutationFn: () => syncAnnotations(slug),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateRelease(slug: string) {
+  const invalidate = useInvalidateProjects();
+  return useMutation<Awaited<ReturnType<typeof createRelease>>, ApiError, ReleaseCreate>({
+    mutationFn: (body) => createRelease(slug, body),
+    onSuccess: invalidate,
+  });
+}
+
+/** Re-verification is a POST (it re-reads every file) but has no side effects. */
+export function useVerifyRelease(slug: string) {
+  return useMutation<Awaited<ReturnType<typeof verifyRelease>>, ApiError, string>({
+    mutationFn: (release) => verifyRelease(slug, release),
   });
 }

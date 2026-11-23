@@ -21,15 +21,17 @@ router = APIRouter()
 async def presign_upload(req: PresignUploadRequest):
     """Validate a declared upload and hand back a presigned PUT.
 
-    The browser uploads the bytes straight to B2 with the returned URL, so they
-    never traverse this Function — that is what lifts Vercel's ~4.5 MB payload
-    ceiling. Size and content-type are signed into the URL (see the service).
+    The browser uploads the image straight to `labeling/raw/<project>/` on B2
+    with the returned URL, so the bytes never traverse this API. Size and
+    content-type are signed into the URL (see the service). A "Sync from B2"
+    on the project then turns the new image into a Label Studio task.
     """
     try:
         # generate_presigned_url does blocking (botocore) work; keep it off the
         # event loop.
         return await run_in_threadpool(
             create_presigned_upload,
+            project=req.project,
             filename=req.filename,
             content_type=req.content_type,
             size_bytes=req.size_bytes,

@@ -1,23 +1,221 @@
 {
   "components": {
     "schemas": {
-      "DailyUploadCount": {
-        "description": "One day's upload count, for the dashboard activity chart.",
+      "AnnotationSyncResult": {
         "properties": {
-          "date": {
-            "title": "Date",
-            "type": "string"
+          "annotated_tasks": {
+            "description": "Tasks Label Studio reports as annotated.",
+            "title": "Annotated Tasks",
+            "type": "integer"
           },
-          "uploads": {
-            "title": "Uploads",
+          "annotation_objects": {
+            "description": "Annotation objects under the target prefix after the sync.",
+            "title": "Annotation Objects",
             "type": "integer"
           }
         },
         "required": [
-          "date",
-          "uploads"
+          "annotation_objects",
+          "annotated_tasks"
         ],
-        "title": "DailyUploadCount",
+        "title": "AnnotationSyncResult",
+        "type": "object"
+      },
+      "AssetItem": {
+        "properties": {
+          "annotation_status": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw images only: its task has at least one annotation.",
+            "title": "Annotation Status"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Run id for pre-labels, release name for exports.",
+            "title": "Group"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_modified": {
+            "format": "date-time",
+            "title": "Last Modified",
+            "type": "string"
+          },
+          "prelabel_status": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw images only: has a pre-label in the latest run.",
+            "title": "Prelabel Status"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "size_bytes",
+          "last_modified",
+          "group",
+          "prelabel_status",
+          "annotation_status"
+        ],
+        "title": "AssetItem",
+        "type": "object"
+      },
+      "AssetPage": {
+        "properties": {
+          "groups": {
+            "description": "Run ids or release names present on this page.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssetItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "raw",
+              "prelabels",
+              "annotations",
+              "exports"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "kind",
+          "prefix",
+          "items",
+          "groups",
+          "next_cursor"
+        ],
+        "title": "AssetPage",
+        "type": "object"
+      },
+      "DatasetRelease": {
+        "description": "A committed release under `labeling/exports/<project>/<release>/`.",
+        "properties": {
+          "annotations": {
+            "title": "Annotations",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "images": {
+            "title": "Images",
+            "type": "integer"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseManifest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Included on create and on the single-release route."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "prelabel_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prelabel Run Id"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "release": {
+            "title": "Release",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "release",
+          "prefix",
+          "created_at",
+          "notes",
+          "images",
+          "annotations",
+          "prelabel_run_id",
+          "manifest"
+        ],
+        "title": "DatasetRelease",
         "type": "object"
       },
       "DeleteFileResponse": {
@@ -360,6 +558,56 @@
         "title": "FileUrlResponse",
         "type": "object"
       },
+      "FlaggedTask": {
+        "description": "A task (or a raw image with no task yet) that blocks a release.",
+        "properties": {
+          "reasons": {
+            "items": {
+              "enum": [
+                "missing_annotation",
+                "missing_prelabel",
+                "missing_source_object",
+                "missing_in_export",
+                "missing_task"
+              ],
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "B2 key of the raw image the task points at.",
+            "title": "Source Key"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Label Studio task id; null for a raw image never synced.",
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "task_id",
+          "source_key",
+          "reasons"
+        ],
+        "title": "FlaggedTask",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -374,28 +622,396 @@
         "type": "object"
       },
       "HealthStatus": {
-        "description": "Liveness plus B2 reachability.\n\nThe route answers HTTP 200 even when B2 is unreachable, so a caller must\nread `b2_connected` rather than trusting the status code.",
+        "description": "Liveness plus B2, Label Studio and ML backend reachability.\n\nThe route answers HTTP 200 even when a dependency is unreachable, so a\ncaller must read the per-service fields rather than trusting the status code.",
         "properties": {
           "b2_connected": {
             "description": "True when the bucket answered a cheap head request.",
             "title": "B2 Connected",
             "type": "boolean"
           },
+          "label_studio": {
+            "$ref": "#/components/schemas/ServiceStatus"
+          },
+          "ml_backend": {
+            "$ref": "#/components/schemas/ServiceStatus"
+          },
           "status": {
-            "description": "\"healthy\" when B2 answered, else \"degraded\".",
+            "description": "\"healthy\" when B2, Label Studio and the ML backend all answered, else \"degraded\".",
             "title": "Status",
             "type": "string"
           }
         },
         "required": [
           "status",
-          "b2_connected"
+          "b2_connected",
+          "label_studio",
+          "ml_backend"
         ],
         "title": "HealthStatus",
         "type": "object"
       },
+      "LabelingProject": {
+        "description": "A Label Studio project bound to one raw-image prefix on B2.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "label_studio_project_id": {
+            "title": "Label Studio Project Id",
+            "type": "integer"
+          },
+          "label_studio_url": {
+            "description": "Deep link that opens the project in Label Studio.",
+            "title": "Label Studio Url",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source_prefix": {
+            "description": "Label Studio source storage prefix (raw images).",
+            "title": "Source Prefix",
+            "type": "string"
+          },
+          "target_prefix": {
+            "description": "Label Studio target storage prefix (annotations).",
+            "title": "Target Prefix",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "description",
+          "labels",
+          "threshold",
+          "model_id",
+          "label_studio_project_id",
+          "label_studio_url",
+          "source_prefix",
+          "target_prefix",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LabelingProject",
+        "type": "object"
+      },
+      "ManifestFileRow": {
+        "description": "One file written under the release prefix, with its integrity data.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "bytes",
+          "sha256"
+        ],
+        "title": "ManifestFileRow",
+        "type": "object"
+      },
+      "ManifestTaskRow": {
+        "description": "One task as it went into the release.",
+        "properties": {
+          "accepted": {
+            "description": "Suggested boxes kept unchanged.",
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "added": {
+            "description": "Boxes drawn that the model did not suggest.",
+            "title": "Added",
+            "type": "integer"
+          },
+          "annotation_boxes": {
+            "title": "Annotation Boxes",
+            "type": "integer"
+          },
+          "annotation_key": {
+            "title": "Annotation Key",
+            "type": "string"
+          },
+          "corrected": {
+            "description": "Suggested boxes kept but moved, resized or relabelled.",
+            "title": "Corrected",
+            "type": "integer"
+          },
+          "prelabel_boxes": {
+            "title": "Prelabel Boxes",
+            "type": "integer"
+          },
+          "prelabel_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prelabel Key"
+          },
+          "removed": {
+            "description": "Suggested boxes the annotator deleted.",
+            "title": "Removed",
+            "type": "integer"
+          },
+          "source_etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Etag"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_id",
+          "source_key",
+          "source_etag",
+          "prelabel_key",
+          "annotation_key",
+          "prelabel_boxes",
+          "annotation_boxes",
+          "accepted",
+          "corrected",
+          "added",
+          "removed"
+        ],
+        "title": "ManifestTaskRow",
+        "type": "object"
+      },
+      "ManifestTotals": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "annotations": {
+            "description": "COCO annotation (box) count.",
+            "title": "Annotations",
+            "type": "integer"
+          },
+          "corrected": {
+            "title": "Corrected",
+            "type": "integer"
+          },
+          "images": {
+            "title": "Images",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "images",
+          "annotations",
+          "accepted",
+          "corrected",
+          "added",
+          "removed"
+        ],
+        "title": "ManifestTotals",
+        "type": "object"
+      },
+      "ModelInfo": {
+        "description": "The local detector the ML backend serves.",
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "license",
+          "source_url",
+          "revision",
+          "device",
+          "labels"
+        ],
+        "title": "ModelInfo",
+        "type": "object"
+      },
+      "PrelabelRun": {
+        "description": "One pre-label run: every task scored once by the local model, saved to B2.",
+        "properties": {
+          "boxes": {
+            "description": "Suggested boxes across every task.",
+            "title": "Boxes",
+            "type": "integer"
+          },
+          "device": {
+            "description": "torch device the ML backend ran on (cuda, mps or cpu).",
+            "title": "Device",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "number"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_revision": {
+            "title": "Model Revision",
+            "type": "string"
+          },
+          "prefix": {
+            "description": "B2 prefix holding one JSON per task plus `_run.json`.",
+            "title": "Prefix",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "run_id": {
+            "description": "`YYYYMMDDTHHMMSSZ-<model-short>`; also the Label Studio model_version.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "tasks": {
+            "description": "Tasks scored in this run.",
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "run_id",
+          "project",
+          "model_id",
+          "model_revision",
+          "device",
+          "threshold",
+          "tasks",
+          "boxes",
+          "prefix",
+          "started_at",
+          "duration_seconds"
+        ],
+        "title": "PrelabelRun",
+        "type": "object"
+      },
+      "PrelabelRunCreate": {
+        "description": "Start a pre-label run. Omit `threshold` to use the project's own.",
+        "properties": {
+          "threshold": {
+            "anyOf": [
+              {
+                "maximum": 0.95,
+                "minimum": 0.05,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Minimum detection confidence kept as a suggestion.",
+            "title": "Threshold"
+          }
+        },
+        "title": "PrelabelRunCreate",
+        "type": "object"
+      },
       "PresignUploadRequest": {
-        "description": "What the browser declares before uploading directly to B2.",
+        "description": "What the browser declares before uploading a raw image directly to B2.",
         "properties": {
           "content_type": {
             "title": "Content Type",
@@ -405,12 +1021,18 @@
             "title": "Filename",
             "type": "string"
           },
+          "project": {
+            "description": "Labeling project slug; the key lands in its raw prefix.",
+            "title": "Project",
+            "type": "string"
+          },
           "size_bytes": {
             "title": "Size Bytes",
             "type": "integer"
           }
         },
         "required": [
+          "project",
           "filename",
           "content_type",
           "size_bytes"
@@ -461,8 +1083,444 @@
         "title": "PresignUploadResponse",
         "type": "object"
       },
+      "ProjectCounts": {
+        "properties": {
+          "annotated_tasks": {
+            "title": "Annotated Tasks",
+            "type": "integer"
+          },
+          "prelabel_runs": {
+            "title": "Prelabel Runs",
+            "type": "integer"
+          },
+          "raw_objects": {
+            "title": "Raw Objects",
+            "type": "integer"
+          },
+          "releases": {
+            "title": "Releases",
+            "type": "integer"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "raw_objects",
+          "tasks",
+          "annotated_tasks",
+          "prelabel_runs",
+          "releases"
+        ],
+        "title": "ProjectCounts",
+        "type": "object"
+      },
+      "ProjectCreate": {
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 80,
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "seed_sample_images": {
+            "default": true,
+            "description": "Copy the 8 pinned CC0 sample images into the raw prefix.",
+            "title": "Seed Sample Images",
+            "type": "boolean"
+          },
+          "threshold": {
+            "default": 0.5,
+            "maximum": 0.95,
+            "minimum": 0.05,
+            "title": "Threshold",
+            "type": "number"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "labels"
+        ],
+        "title": "ProjectCreate",
+        "type": "object"
+      },
+      "ProjectDeleted": {
+        "properties": {
+          "b2_objects_deleted": {
+            "description": "Objects removed from B2 (0 unless purge_b2=true).",
+            "title": "B2 Objects Deleted",
+            "type": "integer"
+          },
+          "label_studio_project_deleted": {
+            "title": "Label Studio Project Deleted",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "label_studio_project_deleted",
+          "b2_objects_deleted"
+        ],
+        "title": "ProjectDeleted",
+        "type": "object"
+      },
+      "ProjectDetail": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ProjectCounts"
+          },
+          "latest_release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetRelease"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrelabelRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/LabelingProject"
+          }
+        },
+        "required": [
+          "project",
+          "counts",
+          "latest_run",
+          "latest_release"
+        ],
+        "title": "ProjectDetail",
+        "type": "object"
+      },
+      "ProjectUpdate": {
+        "description": "Labels are deliberately absent: they are fixed after creation.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "maximum": 0.95,
+                "minimum": 0.05,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ProjectUpdate",
+        "type": "object"
+      },
+      "ReleaseBlocked": {
+        "description": "409 body: the release already exists, or verification found gaps.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "flagged": {
+            "items": {
+              "$ref": "#/components/schemas/FlaggedTask"
+            },
+            "title": "Flagged",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail",
+          "flagged"
+        ],
+        "title": "ReleaseBlocked",
+        "type": "object"
+      },
+      "ReleaseCheck": {
+        "description": "One assertion made while re-verifying a stored release.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "ok",
+          "detail"
+        ],
+        "title": "ReleaseCheck",
+        "type": "object"
+      },
+      "ReleaseCreate": {
+        "description": "Cut an immutable release. Omit `name` to get `v<N+1>`.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Release name, e.g. v1.",
+            "title": "Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "title": "ReleaseCreate",
+        "type": "object"
+      },
+      "ReleaseManifest": {
+        "description": "`manifest.json`: written last, so its presence is what commits a release.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestFileRow"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "label_studio_version": {
+            "title": "Label Studio Version",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_revision": {
+            "title": "Model Revision",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "prelabel_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prelabel Run Id"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "release": {
+            "title": "Release",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestTaskRow"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ManifestTotals"
+          }
+        },
+        "required": [
+          "release",
+          "project",
+          "created_at",
+          "notes",
+          "prelabel_run_id",
+          "model_id",
+          "model_revision",
+          "label_studio_version",
+          "tasks",
+          "files",
+          "totals"
+        ],
+        "title": "ReleaseManifest",
+        "type": "object"
+      },
+      "ServiceStatus": {
+        "description": "Reachability of one companion service (Label Studio or the ML backend).",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the probe failed, when it failed.",
+            "title": "Detail"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ML backend only: the torch device the model runs on.",
+            "title": "Device"
+          },
+          "ok": {
+            "description": "True when the service answered its health probe.",
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "Base URL this API uses to reach the service.",
+            "title": "Url",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reported version (Label Studio release, or model id).",
+            "title": "Version"
+          }
+        },
+        "required": [
+          "ok",
+          "url",
+          "version",
+          "device",
+          "detail"
+        ],
+        "title": "ServiceStatus",
+        "type": "object"
+      },
+      "SyncResult": {
+        "properties": {
+          "in_sync": {
+            "description": "True when tasks_after equals raw_objects.",
+            "title": "In Sync",
+            "type": "boolean"
+          },
+          "raw_objects": {
+            "description": "Raw images under the source prefix that match the image filter.",
+            "title": "Raw Objects",
+            "type": "integer"
+          },
+          "tasks_after": {
+            "title": "Tasks After",
+            "type": "integer"
+          },
+          "tasks_before": {
+            "title": "Tasks Before",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "raw_objects",
+          "tasks_before",
+          "tasks_after",
+          "in_sync"
+        ],
+        "title": "SyncResult",
+        "type": "object"
+      },
       "UploadStats": {
-        "description": "Aggregate bucket figures behind the dashboard stat cards.",
+        "description": "Aggregate bucket figures behind the file browser and command palette.",
         "properties": {
           "total_downloads": {
             "title": "Total Downloads",
@@ -535,6 +1593,116 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VerificationCounts": {
+        "description": "What B2 and Label Studio each hold for one project, side by side.",
+        "properties": {
+          "annotation_objects": {
+            "title": "Annotation Objects",
+            "type": "integer"
+          },
+          "boxes": {
+            "description": "Bounding boxes across the latest annotation of every task.",
+            "title": "Boxes",
+            "type": "integer"
+          },
+          "raw_objects": {
+            "title": "Raw Objects",
+            "type": "integer"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "tasks_with_annotations": {
+            "title": "Tasks With Annotations",
+            "type": "integer"
+          },
+          "tasks_with_prelabels": {
+            "title": "Tasks With Prelabels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "raw_objects",
+          "tasks",
+          "tasks_with_prelabels",
+          "tasks_with_annotations",
+          "annotation_objects",
+          "boxes"
+        ],
+        "title": "VerificationCounts",
+        "type": "object"
+      },
+      "VerificationReport": {
+        "description": "Live diff of raw objects, tasks, pre-labels, annotations (and a release's files).",
+        "properties": {
+          "checks": {
+            "description": "Release re-verification checks; empty for a live project check.",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/VerificationCounts"
+          },
+          "flagged": {
+            "items": {
+              "$ref": "#/components/schemas/FlaggedTask"
+            },
+            "title": "Flagged",
+            "type": "array"
+          },
+          "prelabel_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run the pre-label check used (the latest).",
+            "title": "Prelabel Run Id"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when a stored release was re-verified.",
+            "title": "Release"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "release",
+          "status",
+          "prelabel_run_id",
+          "counts",
+          "flagged",
+          "checks"
+        ],
+        "title": "VerificationReport",
+        "type": "object"
+      },
       "VerifyUploadRequest": {
         "description": "Sent after the direct PUT so the API can inspect the stored object.",
         "properties": {
@@ -552,8 +1720,8 @@
     }
   },
   "info": {
-    "description": "Local API for the Vibe Coding Starter Kit template, providing file upload and management backed by Backblaze B2. This contract documents the template's local API, not a hosted public endpoint.",
-    "title": "Vibe Coding Starter Kit API",
+    "description": "Local API for Label Studio Prelabeling Dataset Versioning. It wires Label Studio to Backblaze B2 as source and target storage, runs local pre-label runs, verifies annotations and cuts immutable COCO releases. This contract documents the sample's local API, not a hosted public endpoint.",
+    "title": "Label Studio Prelabeling Dataset Versioning API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
@@ -848,53 +2016,6 @@
         ]
       }
     },
-    "/files/stats/activity": {
-      "get": {
-        "operationId": "upload_activity_endpoint_files_stats_activity_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "days",
-            "required": false,
-            "schema": {
-              "default": 7,
-              "title": "Days",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/DailyUploadCount"
-                  },
-                  "title": "Response Upload Activity Endpoint Files Stats Activity Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Upload Activity Endpoint",
-        "tags": [
-          "files"
-        ]
-      }
-    },
     "/files/{key}": {
       "delete": {
         "operationId": "delete_file_endpoint_files__key__delete",
@@ -1102,9 +2223,812 @@
         ]
       }
     },
+    "/models": {
+      "get": {
+        "operationId": "get_model_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects": {
+      "get": {
+        "operationId": "list_projects_projects_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LabelingProject"
+                  },
+                  "title": "Response List Projects Projects Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Projects",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "operationId": "create_project_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelingProject"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseBlocked"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}": {
+      "delete": {
+        "operationId": "delete_project_projects__slug__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purge_b2",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Purge B2",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDeleted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Project",
+        "tags": [
+          "projects"
+        ]
+      },
+      "get": {
+        "operationId": "get_project_projects__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project",
+        "tags": [
+          "projects"
+        ]
+      },
+      "patch": {
+        "operationId": "update_project_projects__slug__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelingProject"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}/annotations/sync": {
+      "post": {
+        "operationId": "sync_annotations_projects__slug__annotations_sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationSyncResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseBlocked"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Annotations",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}/assets": {
+      "get": {
+        "operationId": "list_assets_projects__slug__assets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "enum": [
+                "raw",
+                "prelabels",
+                "annotations",
+                "exports"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
+            }
+          },
+          {
+            "in": "query",
+            "name": "release",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Release"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Assets",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/projects/{slug}/prelabel-runs": {
+      "get": {
+        "operationId": "list_prelabel_runs_projects__slug__prelabel_runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrelabelRun"
+                  },
+                  "title": "Response List Prelabel Runs Projects  Slug  Prelabel Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prelabel Runs",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "operationId": "create_prelabel_run_projects__slug__prelabel_runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrelabelRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrelabelRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseBlocked"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Prelabel Run",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}/releases": {
+      "get": {
+        "operationId": "list_releases_projects__slug__releases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasetRelease"
+                  },
+                  "title": "Response List Releases Projects  Slug  Releases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Releases",
+        "tags": [
+          "releases"
+        ]
+      },
+      "post": {
+        "operationId": "create_release_projects__slug__releases_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetRelease"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseBlocked"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/projects/{slug}/releases/{release}": {
+      "get": {
+        "operationId": "get_release_projects__slug__releases__release__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release",
+            "required": true,
+            "schema": {
+              "title": "Release",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetRelease"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/projects/{slug}/releases/{release}/verify": {
+      "post": {
+        "operationId": "verify_release_projects__slug__releases__release__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release",
+            "required": true,
+            "schema": {
+              "title": "Release",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/projects/{slug}/sync": {
+      "post": {
+        "operationId": "sync_project_projects__slug__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseBlocked"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Project",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}/verification": {
+      "get": {
+        "operationId": "get_verification_projects__slug__verification_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Verification",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/upload/presign": {
       "post": {
-        "description": "Validate a declared upload and hand back a presigned PUT.\n\nThe browser uploads the bytes straight to B2 with the returned URL, so they\nnever traverse this Function \u2014 that is what lifts Vercel's ~4.5 MB payload\nceiling. Size and content-type are signed into the URL (see the service).",
+        "description": "Validate a declared upload and hand back a presigned PUT.\n\nThe browser uploads the image straight to `labeling/raw/<project>/` on B2\nwith the returned URL, so the bytes never traverse this API. Size and\ncontent-type are signed into the URL (see the service). A \"Sync from B2\"\non the project then turns the new image into a Label Studio task.",
         "operationId": "presign_upload_upload_presign_post",
         "requestBody": {
           "content": {

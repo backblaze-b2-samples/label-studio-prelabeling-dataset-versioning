@@ -27,7 +27,18 @@ from app.config import (  # noqa: E402
     REQUIRED_B2_SETTINGS,
     settings,
 )
-from app.runtime import files, health, metrics, ratelimit, upload  # noqa: E402
+from app.runtime import (  # noqa: E402
+    files,
+    health,
+    library,
+    metrics,
+    projects,
+    ratelimit,
+    releases,
+    upload,
+)
+from app.runtime.errors import service_error_handler  # noqa: E402
+from app.service.errors import ServiceError  # noqa: E402
 from app.service.files import warm_listing_cache  # noqa: E402
 
 # --- Startup validation ---
@@ -107,11 +118,13 @@ logger = logging.getLogger("api")
 
 # --- App setup ---
 
-API_TITLE = "Vibe Coding Starter Kit API"
+API_TITLE = "Label Studio Prelabeling Dataset Versioning API"
 API_DESCRIPTION = (
-    "Local API for the Vibe Coding Starter Kit template, providing file upload "
-    "and management backed by Backblaze B2. This contract documents the "
-    "template's local API, not a hosted public endpoint."
+    "Local API for Label Studio Prelabeling Dataset Versioning. "
+    "It wires Label Studio to Backblaze B2 as source and target storage, runs "
+    "local pre-label runs, verifies annotations and cuts immutable COCO "
+    "releases. This contract documents the sample's local API, not a hosted "
+    "public endpoint."
 )
 API_VERSION = "0.1.0"
 
@@ -159,11 +172,16 @@ app.add_middleware(
     # reflect an attacker's origin *with* credentials. Flip to True only when
     # you add cookie-based auth AND have tightened the origin allowlist.
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
+app.add_exception_handler(ServiceError, service_error_handler)
+
 app.include_router(health.router, tags=["health"])
+app.include_router(projects.router, tags=["projects"])
+app.include_router(releases.router, tags=["releases"])
+app.include_router(library.router, tags=["library"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(files.router, tags=["files"])
 app.include_router(metrics.router, tags=["metrics"])

@@ -1,12 +1,14 @@
 import type {
   FileMetadataDetail,
   FileStatus,
-} from "@vibe-coding-starter-kit/shared";
+} from "@label-studio-prelabeling-dataset-versioning/shared";
 
 /** One row of the upload queue. Owned by `UploadQueueProvider`. */
 export interface UploadItem {
   id: string;
   file: File;
+  /** Labeling project the image goes to (`labeling/raw/<project>/`). */
+  project: string;
   progress: number;
   status: FileStatus;
   error?: string;
