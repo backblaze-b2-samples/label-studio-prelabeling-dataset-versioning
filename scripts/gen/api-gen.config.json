@@ -110,6 +110,26 @@
     "post /projects": {
       "route": "projectCreate"
     },
+    "get /project-creates": {
+      "route": "projectCreates",
+      "query": {
+        "name": "projectCreates",
+        "segments": [
+          "projects",
+          "creates"
+        ]
+      }
+    },
+    "get /dashboard": {
+      "route": "dashboard",
+      "query": {
+        "name": "dashboard",
+        "segments": [
+          "projects",
+          "dashboard"
+        ]
+      }
+    },
     "get /projects/{slug}": {
       "route": "project",
       "query": {
@@ -117,6 +137,16 @@
         "segments": [
           "projects",
           "detail"
+        ]
+      }
+    },
+    "get /projects/{slug}/progress": {
+      "route": "projectProgress",
+      "query": {
+        "name": "projectProgress",
+        "segments": [
+          "projects",
+          "progress"
         ]
       }
     },

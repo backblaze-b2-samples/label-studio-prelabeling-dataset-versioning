@@ -142,11 +142,16 @@ class LabelStudioClient:
 
     # --- tasks, predictions, annotations --------------------------------
     def list_tasks(self, project_id: int) -> list[dict]:
+        """Every task with its stored data. `resolve_uri=false` keeps the raw
+        `s3://bucket/key` image URI; by default Label Studio rewrites it to a
+        `/tasks/<id>/resolve/?fileuri=...` proxy URL meant for browsers."""
         tasks: list[dict] = []
         page = 1
         while True:
             data = self._call(
-                "GET", "/api/tasks/", params={"project": project_id, "page": page, "page_size": 100}
+                "GET",
+                "/api/tasks/",
+                params={"project": project_id, "page": page, "page_size": 100, "resolve_uri": "false"},
             )
             batch = data.get("tasks", [])
             tasks.extend(batch)

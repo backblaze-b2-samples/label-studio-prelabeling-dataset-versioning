@@ -1,6 +1,7 @@
 import type {
   AnnotationSyncResult,
   AssetPage,
+  DashboardSummary,
   DatasetRelease,
   DeleteFileResponse,
   FileMetadata,
@@ -15,8 +16,10 @@ import type {
   PrelabelRunCreate,
   PresignUploadResponse,
   ProjectCreate,
+  ProjectCreating,
   ProjectDeleted,
   ProjectDetail,
+  ProjectProgress,
   ProjectUpdate,
   ReleaseCreate,
   SyncResult,
@@ -101,21 +104,22 @@ function networkError(): ApiError {
  * "check the API logs" sends the developer to the one place that looks fine —
  * the presign that produced this URL succeeded and logged a clean 200.
  *
- * On a deployed origin the overwhelmingly likely cause is that the *bucket's*
- * CORS does not allow that origin, so the browser blocks the PUT before it
- * leaves and XHR reports only a contentless `error` event. Local dev rarely
- * trips it because localhost origins are usually already allowed — which is
- * exactly why it first appears immediately after a deploy. Name the cause and
- * the remedy instead of leaving a mystery.
+ * The overwhelmingly likely cause is that the *bucket's* CORS does not allow
+ * this page's origin (locally: the README setup step was skipped; deployed: a
+ * new origin), so the browser blocks the PUT before it leaves and XHR reports
+ * only a contentless `error` event. Name the cause and the exact command for
+ * the current origin instead of leaving a mystery.
  */
-function storageNetworkError(): ApiError {
+export function storageNetworkError(origin?: string): ApiError {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return new ApiError("You appear to be offline — check your connection", 0);
   }
+  const here =
+    origin ?? (typeof window !== "undefined" ? window.location.origin : "<your origin>");
   return new ApiError(
-    "Couldn't upload to B2 storage. If this app is deployed, the bucket's CORS " +
-      "must allow this origin — run services/api/scripts/setup_b2_cors.py " +
-      "--origin <your origin>.",
+    `Couldn't upload to B2 storage: the bucket's CORS must allow ${here}. Run ` +
+      "services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py " +
+      `--origin ${here} --apply, then retry.`,
     0,
   );
 }
@@ -297,6 +301,28 @@ export async function deleteFile(key: string) {
 }
 
 /**
+ * Read a small object's body as text through its presigned (inline) preview
+ * URL, for the Files dialog's JSON/text preview. The bytes come straight from
+ * B2, so a network failure means the bucket's CORS does not allow this origin
+ * (same remedy as an upload), not an API fault.
+ */
+export async function getStorageText(url: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    const here = typeof window !== "undefined" ? window.location.origin : "<your origin>";
+    throw new ApiError(
+      `Couldn't read the file from B2: the bucket's CORS must allow ${here} ` +
+        `(services/api/scripts/setup_b2_cors.py --origin ${here} --apply).`,
+      0,
+    );
+  }
+  if (!res.ok) throw new ApiError(`B2 answered ${res.status} for the preview`, res.status);
+  return res.text();
+}
+
+/**
  * Upload a raw image directly to B2 in three steps: presign (the API validates
  * the declared file and signs a short-lived PUT into
  * `labeling/raw/<project>/`), a direct browser→B2 PUT, then verify (the API
@@ -387,11 +413,20 @@ export const getModels = () => apiFetch<ModelInfo>(R.models.path);
 
 export const getProjects = () => apiFetch<LabelingProject[]>(R.projects.path);
 
+/** Creates still running on the API (no project record yet). */
+export const getProjectCreates = () => apiFetch<ProjectCreating[]>(R.projectCreates.path);
+
+/** Dashboard totals and the newest releases, aggregated server-side in one call. */
+export const getDashboard = () => apiFetch<DashboardSummary>(R.dashboard.path);
+
 export const createProject = (body: ProjectCreate) =>
   apiFetch<LabelingProject>(R.projectCreate.path, jsonInit(R.projectCreate.method, body));
 
 export const getProject = (slug: string) =>
   apiFetch<ProjectDetail>(routePath(R.project.path, { slug }));
+
+export const getProjectProgress = (slug: string) =>
+  apiFetch<ProjectProgress>(routePath(R.projectProgress.path, { slug }));
 
 export const updateProject = (slug: string, body: ProjectUpdate) =>
   apiFetch<LabelingProject>(

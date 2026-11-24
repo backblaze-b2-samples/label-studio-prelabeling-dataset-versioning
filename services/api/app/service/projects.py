@@ -11,7 +11,7 @@ import logging
 from datetime import UTC, datetime
 
 from app.config import settings
-from app.repo import b2_objects
+from app.repo import b2_objects, progress
 from app.service import descriptors, keys, prelabels, releases, seed
 from app.service.deps import label_studio, ml_backend, upstream
 from app.service.errors import ConflictError, InvalidRequestError
@@ -21,9 +21,11 @@ from app.types import (
     ModelInfo,
     ProjectCounts,
     ProjectCreate,
+    ProjectCreating,
     ProjectDeleted,
     ProjectDescriptor,
     ProjectDetail,
+    ProjectProgress,
     ProjectUpdate,
     SyncResult,
 )
@@ -47,6 +49,17 @@ def create_project(request: ProjectCreate) -> LabelingProject:
         raise InvalidRequestError(f"Title gives an unusable slug: {e}") from None
     if descriptors.exists(slug):
         raise ConflictError(f"A project with slug '{slug}' already exists")
+    # Registered for the whole create, so a reloaded /projects page still
+    # shows it (`list_creating`) and a second create of the same title is refused.
+    if not progress.start(progress.CREATE, slug, "Checking the detector's labels", subject=request.title):
+        raise ConflictError(f"A project with slug '{slug}' is already being created")
+    try:
+        return _create(slug, request)
+    finally:
+        progress.finish(progress.CREATE, slug)
+
+
+def _create(slug: str, request: ProjectCreate) -> LabelingProject:
     info = model_info()
     unknown = sorted(set(request.labels) - set(info.labels))
     if unknown:
@@ -56,6 +69,7 @@ def create_project(request: ProjectCreate) -> LabelingProject:
     if request.seed_sample_images:
         seed.seed_project(slug)
 
+    progress.update(progress.CREATE, slug, stage="Connecting Label Studio's storages and the ML backend")
     ls = label_studio()
     project_id: int | None = None
     try:
@@ -129,6 +143,32 @@ def get_detail(slug: str) -> ProjectDetail:
         latest_run=runs[0] if runs else None,
         latest_release=project_releases[0] if project_releases else None,
     )
+
+
+def get_progress(slug: str) -> ProjectProgress:
+    """Running jobs for `slug`. No descriptor needed: seeding runs before it exists."""
+    descriptors.valid_slug(slug)
+    return ProjectProgress(
+        seeding=progress.get(progress.SEEDING, slug),
+        prelabel=progress.get(progress.PRELABEL, slug),
+        release=progress.get(progress.RELEASE, slug),
+    )
+
+
+def list_creating() -> list[ProjectCreating]:
+    """Creates still in flight on this API process, oldest first.
+
+    While images copy, the seeding job (N of M images) is the better progress
+    to show; otherwise the create job's own stage.
+    """
+    return [
+        ProjectCreating(
+            slug=slug,
+            title=job.subject or slug,
+            progress=progress.get(progress.SEEDING, slug) or job,
+        )
+        for slug, job in progress.running(progress.CREATE)
+    ]
 
 
 def update_project(slug: str, request: ProjectUpdate) -> LabelingProject:

@@ -80,7 +80,7 @@ pnpm run setup      # .env from .env.example, generates the Label Studio token +
    the web app; the labeling UI loads each image from a presigned B2 URL):
 
    ```bash
-   services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply
+   services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --origin http://127.0.0.1:3000 --apply
    ```
 
    It merges two rules into the bucket's CORS: the web origin (GET/PUT/HEAD) and

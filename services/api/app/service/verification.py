@@ -5,6 +5,8 @@ Label Studio and writes nothing. A project is `complete` only when there is at
 least one task and nothing is flagged — that is the gate a release must pass.
 """
 
+from collections.abc import Callable
+
 from app.service import annotations, coco, descriptors, prelabels
 from app.service.deps import label_studio, upstream
 from app.types import FlaggedTask, VerificationCounts, VerificationReport
@@ -54,15 +56,31 @@ def diff(
     return counts, flagged
 
 
-def gather(slug: str) -> dict:
-    """Everything a verification or a release needs, read once."""
+GATHER_STEPS = (
+    "Listing Label Studio tasks",
+    "Reading the pre-label records on B2",
+    "Reading the annotation objects on B2",
+    "Listing the raw images on B2",
+)
+
+
+def gather(slug: str, step: Callable[[str], None] | None = None) -> dict:
+    """Everything a verification or a release needs, read once.
+
+    `step` is called with each of `GATHER_STEPS` as it starts (release progress).
+    """
+    say = step or (lambda _stage: None)
     descriptor = descriptors.load(slug)
+    say(GATHER_STEPS[0])
     with upstream():
         tasks = label_studio().list_tasks(descriptor.label_studio_project_id)
+    say(GATHER_STEPS[1])
     runs = prelabels.list_runs(slug)
     run_id = runs[0].run_id if runs else None
     records = prelabels.load_records(slug, run_id) if run_id else {}
+    say(GATHER_STEPS[2])
     latest, object_count = annotations.load(slug)
+    say(GATHER_STEPS[3])
     raw = descriptors.raw_images(slug)
     return {
         "descriptor": descriptor,

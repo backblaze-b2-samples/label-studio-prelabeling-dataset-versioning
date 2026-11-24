@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-11-23 -->
+<!-- last_verified: 2026-11-24 -->
 # Feature: Dataset Releases
 
 ## Purpose
@@ -23,13 +23,14 @@ Cut an immutable, auditable COCO dataset from the annotation objects on B2, with
 - 409 if `manifest.json` already exists (immutability) or if live verification is incomplete (the body lists the flagged tasks)
 - Build COCO, fetch Label Studio's export, cross-check (same task set, same box count per task); 409 on disagreement, nothing committed
 - Write the two data files, hash them, write the manifest
+- Progress: the cut registers itself in `repo/progress.py` and reports each of `RELEASE_STEPS` (the four reads of `verification.gather`, then fetch the export, build COCO and cross-check, write the data files, write the manifest) as `done`/`total` steps on `GET /projects/{slug}/progress` (`ProjectProgress.release`); the dialog shows them as a bar. A second cut on the same project while one runs is a 409
 
 ## Edge Cases
 - A crash between the data files and the manifest leaves no committed release; the next cut of that name overwrites the partial files
 - Annotation counting matches regions by id: Label Studio keeps a prediction region's id when an annotator accepts it
 
 ## Verification
-- `test_loop_services.py::test_full_loop` (409 while incomplete, 409 on re-cut, tampered file fails re-verification), `test_cross_check_mismatch_blocks_release`, `test_coco.py`
+- `test_loop_services.py::test_full_loop` (409 while incomplete, 409 on re-cut, tampered file fails re-verification), `test_cross_check_mismatch_blocks_release`, `test_coco.py`, `test_progress.py` (release steps, duplicate refusal)
 - Live: `pnpm test:live:loop` checks every manifest file's size and sha256 on B2
 
 ## Related Docs

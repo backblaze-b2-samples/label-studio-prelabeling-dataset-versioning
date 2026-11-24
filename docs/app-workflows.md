@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-11-23 -->
+<!-- last_verified: 2026-11-24 -->
 # App Workflows
 
 User journeys inside the application. The loop, in order: set up a project ->
@@ -14,7 +14,9 @@ verify -> cut a release.
 - Threshold: segmented control 0.3 / 0.5 / 0.7, pre-selected from Settings (0.5 by default), with "0.5 is a sound default; lower adds more boxes to correct."
 - Seed sample images: switch, on by default — "Copies the 8 CC0 sample images into this project's raw prefix."
 - **Create project** shows a status line while Label Studio is wired to B2 (the first seed downloads the images from Wikimedia Commons once, so it can take a minute), then lands on the project page
+- Reloading `/projects` mid-create still shows "Creating <title>: … N of 8" above the list until the project lands, and a second create of the same title is refused
 - On the project page, **Sync from B2** turns every raw image into a Label Studio task; the toast reports tasks vs raw images and warns if they differ
+- While Label Studio scans, the button reads "Syncing…" and a stage line names the B2 prefix being scanned, with the elapsed seconds
 - **Edit project** opens pre-filled (title, description, threshold); labels are shown read-only with the reason they are fixed
 - **Delete project** (danger zone) asks for the slug to be typed; "Also delete this project's B2 data" is off by default
 - See: [Labeling Projects](features/labeling-projects.md)
@@ -65,6 +67,7 @@ verify -> cut a release.
 ## Pre-label Tasks
 
 - On a synced project, **Run pre-labels** sends every task to the local model at the project's threshold
+- A **Sync from B2** that adds tasks starts this run by itself; while it runs the page shows "Scoring tasks… N of M" with a progress bar, also after a reload, and refuses a second run
 - The toast reports the run id, boxes, tasks, duration and the device used (cpu in the default container)
 - The run appears in the "Pre-label runs" tab and in the Library; Label Studio now shows these boxes as suggestions
 - See: [Pre-label Runs](features/prelabel-runs.md)
@@ -74,7 +77,7 @@ verify -> cut a release.
 - **Open in Label Studio** opens the project (sign in with `LABEL_STUDIO_USERNAME` and the generated `LABEL_STUDIO_PASSWORD` from `.env`)
 - Each task opens with the latest run's boxes; the annotator moves, relabels, deletes or adds boxes and submits
 - Label Studio's target storage writes each submitted annotation to `labeling/annotations/<slug>/` on B2
-- Back in the app, **Sync annotations** pushes any annotation not yet on B2 and reports the object count
+- Back in the app, **Sync annotations** pushes any annotation not yet on B2 and reports the object count; while it runs the button reads "Syncing annotations…" with a stage line and the elapsed seconds
 - See: [Label Studio Stack](features/label-studio-stack.md)
 
 ## Verify a Project or Release
@@ -87,6 +90,8 @@ verify -> cut a release.
 
 - **Cut release** opens a dialog: name (placeholder `v<N+1>`, empty means that), optional notes
 - If any task is flagged, the release is refused and the dialog lists exactly those tasks
+- While it writes, the dialog shows the server's current step ("Step N of 8: …") with a progress bar
 - On success the toast names the prefix; the release appears on the Releases tab, the dashboard and the Library
+- With nothing changed since, the project page reads "Done: release vN is on B2 — view its manifest" instead of "Next: Cut a release"
 - A release with the same name again is refused: releases are immutable
 - See: [Dataset Releases](features/dataset-releases.md)

@@ -8,17 +8,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useProjects, useReleasesFor } from "@/lib/queries";
+import { useDashboard } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
 
 export function RecentReleasesTable() {
-  const projects = useProjects();
-  const results = useReleasesFor((projects.data ?? []).map((p) => p.slug));
-  const loading = projects.isLoading || results.some((r) => r.isLoading);
-  const releases = results
-    .flatMap((r) => r.data ?? [])
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, 10);
+  // Same query as the stat cards: one request, newest 10 releases, sorted server-side.
+  const dashboard = useDashboard();
+  const loading = dashboard.isLoading;
+  const releases = dashboard.data?.recent_releases ?? [];
 
   return (
     <Card>
@@ -41,8 +38,8 @@ export function RecentReleasesTable() {
               <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
-        ) : projects.error ? (
-          <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
+        ) : dashboard.error ? (
+          <ErrorState error={dashboard.error} onRetry={() => dashboard.refetch()} />
         ) : releases.length === 0 ? (
           <EmptyState
             icon={PackageOpen}

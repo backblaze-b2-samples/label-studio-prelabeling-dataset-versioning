@@ -2,7 +2,6 @@
 
 import {
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -15,6 +14,7 @@ import {
   deleteFile,
   deleteProject,
   getAssets,
+  getDashboard,
   getDownloadUrl,
   getFileDetail,
   getFiles,
@@ -24,8 +24,11 @@ import {
   getPreviewUrl,
   getPrelabelRuns,
   getProject,
+  getProjectCreates,
+  getProjectProgress,
   getProjects,
   getReleases,
+  getStorageText,
   getVerification,
   syncAnnotations,
   syncProject,
@@ -37,7 +40,9 @@ import type {
   FileMetadata,
   FileMetadataDetail,
   FileUrlResponse,
+  PrelabelRun,
   PrelabelRunCreate,
+  ProjectDetail,
   ProjectCreate,
   ProjectUpdate,
   ReleaseCreate,
@@ -93,6 +98,20 @@ export function usePreviewUrl(key: string | undefined, enabled: boolean) {
     queryFn: () => getPreviewUrl(key as string),
     enabled: enabled && !!key,
     staleTime: 60_000,
+  });
+}
+
+// Body of a small JSON/text object, read through its presigned preview URL
+// (so `url` must come from usePreviewUrl). Keyed under the file's preview key,
+// so dropping a deleted file's preview drops this too. The caller caps the
+// size before enabling it (see lib/text-preview.ts).
+export function usePreviewText(key: string | undefined, url: string | null, enabled: boolean) {
+  return useQuery<string, ApiError>({
+    queryKey: [...qk.preview(key ?? ""), "text"],
+    queryFn: () => getStorageText(url as string),
+    enabled: enabled && !!key && !!url,
+    staleTime: 60_000,
+    retry: false,
   });
 }
 
@@ -190,6 +209,7 @@ export function useDeleteFile() {
 
 export const projectKeys = {
   detail: (slug: string) => [...qk.projectDetail(), slug] as const,
+  progress: (slug: string) => [...qk.projectProgress(), slug] as const,
   runs: (slug: string) => [...qk.prelabelRuns(), slug] as const,
   releases: (slug: string) => [...qk.releases(), slug] as const,
   verification: (slug: string) => [...qk.verification(), slug] as const,
@@ -210,16 +230,50 @@ export function useProject(slug: string) {
   return useQuery({ queryKey: projectKeys.detail(slug), queryFn: () => getProject(slug), enabled: !!slug });
 }
 
-/** Details for several projects at once (dashboard aggregates). */
-export function useProjectDetails(slugs: string[]) {
-  return useQueries({
-    queries: slugs.map((slug) => ({ queryKey: projectKeys.detail(slug), queryFn: () => getProject(slug) })),
+/** How often a running seed / pre-label job is polled (stays well inside the read rate limit). */
+export const PROGRESS_POLL_MS = 1500;
+
+/**
+ * Seeding / pre-label progress for one project. Polls while `poll` is set (the
+ * caller has a create or run in flight) and keeps polling on its own while the
+ * server reports a job, so a run started before a reload is still followed.
+ */
+export function useProjectProgress(slug: string, { poll = false, enabled = true }: QueryGate & { poll?: boolean } = {}) {
+  return useQuery({
+    queryKey: projectKeys.progress(slug),
+    queryFn: () => getProjectProgress(slug),
+    enabled: enabled && !!slug,
+    staleTime: 0,
+    retry: false,
+    refetchInterval: (query) =>
+      poll || query.state.data?.prelabel || query.state.data?.seeding || query.state.data?.release
+        ? PROGRESS_POLL_MS
+        : false,
   });
 }
 
-export function useReleasesFor(slugs: string[]) {
-  return useQueries({
-    queries: slugs.map((slug) => ({ queryKey: projectKeys.releases(slug), queryFn: () => getReleases(slug) })),
+/**
+ * Dashboard totals and recent releases in ONE request. Fetching every project's
+ * detail and releases from the browser (1 + 2N calls) queued behind the
+ * six-connections-per-host limit and left the cards as skeletons for 10-14s.
+ * Under `qk.projects()`, so any project action refreshes it.
+ */
+export function useDashboard() {
+  return useQuery({ queryKey: qk.dashboard(), queryFn: getDashboard });
+}
+
+/**
+ * Creates still running on the API, so /projects can show them after a reload
+ * (the create dialog's own progress dies with the page). Polls while any is
+ * running; under `qk.projects()`, so a finished create refreshes it.
+ */
+export function useProjectCreates() {
+  return useQuery({
+    queryKey: qk.projectCreates(),
+    queryFn: getProjectCreates,
+    staleTime: 0,
+    retry: false,
+    refetchInterval: (query) => ((query.state.data ?? []).length > 0 ? PROGRESS_POLL_MS : false),
   });
 }
 
@@ -254,7 +308,7 @@ export function useAssets(
 }
 
 /** After any project action: every project view, plus the bucket views. */
-function useInvalidateProjects() {
+export function useInvalidateProjects() {
   const qc = useQueryClient();
   return () => {
     qc.invalidateQueries({ queryKey: qk.projects() });
@@ -299,11 +353,30 @@ export function useSyncProject(slug: string) {
   });
 }
 
+/**
+ * Put a finished run into the cached detail and run list at once. Invalidation
+ * alone left the Overview on "Pre-label runs 0" for the ~4s the detail refetch
+ * takes (it lists every Label Studio task and B2 prefix), while the toast
+ * already announced the run. Exported for tests.
+ */
+export function addRunToCache(qc: QueryClient, slug: string, run: PrelabelRun) {
+  qc.setQueryData<ProjectDetail>(projectKeys.detail(slug), (previous) =>
+    previous
+      ? { ...previous, latest_run: run, counts: { ...previous.counts, prelabel_runs: previous.counts.prelabel_runs + 1 } }
+      : previous,
+  );
+  qc.setQueryData<PrelabelRun[]>(projectKeys.runs(slug), (previous) => (previous ? [run, ...previous] : previous));
+}
+
 export function useCreatePrelabelRun(slug: string) {
+  const qc = useQueryClient();
   const invalidate = useInvalidateProjects();
-  return useMutation<Awaited<ReturnType<typeof createPrelabelRun>>, ApiError, PrelabelRunCreate>({
+  return useMutation<PrelabelRun, ApiError, PrelabelRunCreate>({
     mutationFn: (body) => createPrelabelRun(slug, body),
-    onSuccess: invalidate,
+    onSuccess: (run) => {
+      addRunToCache(qc, slug, run);
+      invalidate();
+    },
   });
 }
 

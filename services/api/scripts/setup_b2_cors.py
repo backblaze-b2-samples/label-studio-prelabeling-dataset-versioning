@@ -71,7 +71,8 @@ def _current_rules(client) -> list[dict]:
             "CORSRules", []
         )
     except ClientError as e:
-        if e.response.get("Error", {}).get("Code") == "NoSuchCORSConfiguration":
+        # AWS spells it NoSuchCORSConfiguration; B2 answers NoSuchCorsConfiguration.
+        if str(e.response.get("Error", {}).get("Code", "")).lower() == "nosuchcorsconfiguration":
             return []
         raise
 

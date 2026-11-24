@@ -29,7 +29,7 @@ Add raw images to a labeling project by uploading them straight from the browser
 ## Edge Cases
 - No project picked -> the dropzone is disabled with "Pick a project first"
 - Same filename twice -> same key; B2 keeps both versions
-- Upload on a deployed origin -> run `setup_b2_cors.py --origin <origin> --apply`
+- Bucket CORS does not allow this origin (local setup step 2 skipped, or a new deployed origin) -> the error names the exact command for the current page origin: `services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin <window.location.origin> --apply`
 
 ## UX States
 - Disabled (no project, or a queue in flight), uploading with progress, complete, error with retry

@@ -12,12 +12,12 @@ import time
 from datetime import UTC, datetime
 
 from app.config import settings
-from app.repo import b2_objects
+from app.repo import b2_objects, progress
 from app.service import coco, descriptors, keys
 from app.service.deps import label_studio, ml_backend, upstream
 from app.service.errors import ConflictError
 from app.service.label_config import build_label_config
-from app.types import PrelabelRun
+from app.types import PrelabelRun, ProjectDescriptor
 
 logger = logging.getLogger(__name__)
 MODEL_SHORT = "rtdetr-r18"
@@ -35,7 +35,21 @@ def _record_stems(tasks: list[dict]) -> dict[int, str]:
 
 
 def run(slug: str, threshold: float | None = None) -> PrelabelRun:
+    """Score every task once. One run per project at a time (409 otherwise).
+
+    Reports `done`/`total` tasks to `repo.progress` as it goes, so the web app
+    can show "N of M" and still see the run after a reload.
+    """
     descriptor = descriptors.load(slug)
+    if not progress.start(progress.PRELABEL, slug, "Listing tasks in Label Studio"):
+        raise ConflictError("A pre-label run is already in progress for this project.")
+    try:
+        return _run(slug, descriptor, threshold)
+    finally:
+        progress.finish(progress.PRELABEL, slug)
+
+
+def _run(slug: str, descriptor: ProjectDescriptor, threshold: float | None) -> PrelabelRun:
     threshold = descriptor.threshold if threshold is None else threshold
     started = datetime.now(UTC)
     clock = time.monotonic()
@@ -49,6 +63,8 @@ def run(slug: str, threshold: float | None = None) -> PrelabelRun:
         label_config = build_label_config(descriptor.labels)
         stems = _record_stems(tasks)
         boxes = 0
+        done = 0
+        progress.update(progress.PRELABEL, slug, stage="Scoring tasks", total=len(tasks))
         size = max(1, settings.prelabel_batch_size)
         for start in range(0, len(tasks), size):
             batch = tasks[start : start + size]
@@ -58,6 +74,9 @@ def run(slug: str, threshold: float | None = None) -> PrelabelRun:
                 boxes += _store_task_prediction(
                     slug, run_id, stems[task["id"]], task, prediction, info, threshold
                 )
+                done += 1
+                progress.update(progress.PRELABEL, slug, done=done)
+        progress.update(progress.PRELABEL, slug, stage="Saving the run summary")
         duration = round(time.monotonic() - clock, 2)
         summary = PrelabelRun(
             run_id=run_id,

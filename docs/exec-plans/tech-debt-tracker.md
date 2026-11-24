@@ -57,3 +57,18 @@ Known tech debt items. Agents update this when they discover or create tech debt
 | Custom `FileNotFoundError` shadowed the built-in | Renamed to `FileNotFoundServiceError` |
 | Dropzone accepted any file type client-side | `accept` allow-list mirroring backend `ALLOWED_TYPES` (tested for drift) |
 | No test harness for feature specs | pytest suite across upload, files, activity, errors, validation, rate limit, pagination |
+
+## 2026-11-24 — verify
+
+- friction (unresolved after 3 rounds): Project page after all tasks annotated — headline "Next: Cut a release." with sub-line "Sync annotations to B2, Verify, then Cut release." → the headline skips the required Sync annotations step (.local/verify/A-r3/13-before-sync-annotations.png)
+- friction (unresolved after 3 rounds): /upload — 3 files "Uploaded" with no warning although their names match seeded images; project stays at 8 images → uploads silently overwrite same-named raw images instead of adding (.local/verify/B-r3/07-upload-done.png)
+- friction (unresolved after 3 rounds): Library during background create — "Creating project … in the background…" toast unchanged for 10s+ with no count → the background-create notice shows no live progress, unlike the dialog's "N of 8" bar (.local/verify/B-r3/02-library-during-create.png)
+- Cut release dialog — after success the dialog stays open with empty Name/Notes and an enabled "Cut release" → success isn't shown where the action happened; invites a second release (.local/verify/B-r3/27-release-result.png)
+- Dashboard — the top-right primary button reads "Labeling projects" (link to /projects) → no direct "New project" action from the landing page (.local/verify/A-r3/01-dashboard-loaded.png)
+- Project page during auto-chained pre-label — banner still says "Next: Run pre-labels" while "Scoring tasks… n of 8" runs → the banner should reflect the running step (.local/verify/A-r3/06-syncing.png)
+- Project next-step line — "1 task still need an annotation." → singular grammar ("needs") (.local/verify/C-r3/23-verify-flags-unannotated.png)
+- /upload — "1 file need attention."; progress bars have aria-valuenow=null → grammar, and the bar value isn't exposed to assistive tech (.local/verify/B-r3/06-upload-midwait.png)
+- Library / Files listings — tables of keys with no thumbnails → images are only visible after opening a preview (.local/verify/B-r3/13-library.png)
+- Releases tab — the "v1" cell is a link to the manifest but reads as plain text → make the manifest link look clickable (.local/verify/A-r2/16-releases-tab.png)
+- Files preview / upload on http://127.0.0.1:3000 — "the bucket's CORS must allow http://127.0.0.1:3000" → the bucket CORS setup only adds localhost by default; consider having setup_b2_cors.py add both dev origins (.local/verify/A-r3/21-manifest.png)
+- /projects list — static grey skeleton with busy:false while B2 is slow → loading state has no motion/aria-busy and no timeout message (.local/verify/B-r2/31-list-after-reload.png)

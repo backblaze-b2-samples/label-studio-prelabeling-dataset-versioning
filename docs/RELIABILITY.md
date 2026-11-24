@@ -1,4 +1,4 @@
-<!-- last_verified: 2026-11-23 -->
+<!-- last_verified: 2026-11-24 -->
 # Reliability
 
 Reliability expectations and practices for this project.
@@ -39,6 +39,7 @@ Reliability expectations and practices for this project.
 The download counter and the `/metrics` counters are **in-process, per replica**. Consequences to plan for before scaling:
 
 - **Download counter** (`app/repo/counter.py`) persists to a JSON file at `DOWNLOAD_COUNT_FILE` (default `.data/download_count.json`, resolved from the repo root — deliberately outside `services/api/`, which `uvicorn --reload` watches, so a download never writes into the dev reloader's watch tree). On an ephemeral filesystem (Railway without a mounted volume or Vercel Functions) it **resets to 0 on every redeploy**. With multiple replicas or Function instances each keeps its own file/count. For durable, shared counts: mount a persistent volume or swap the adapter for Redis/DB.
+- **Job progress** (`app/repo/progress.py`, behind `GET /projects/{slug}/progress` and `GET /project-creates`) lives in process memory: it survives a browser reload, not an API restart (the job's request dies with it anyway). With several replicas each knows only its own jobs, and the one-create-per-slug, one-pre-label-run and one-release-per-project guards are per replica; a shared store (Redis) is the swap-in.
 - **`/metrics` counters** live in process memory and reset on restart. Behind a load balancer, each replica reports only its own slice — scrape with an instance label and aggregate, or push to a shared collector.
 
 ## Rate Limiting

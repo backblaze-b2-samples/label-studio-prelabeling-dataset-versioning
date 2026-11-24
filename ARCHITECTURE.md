@@ -196,6 +196,7 @@ still in step.
 | `DELETE /files-by-key` | `DeleteFileResponse` | `fileByKeyDelete` |
 | `DELETE /files/{key}` | `DeleteFileResponse` | `legacyFileDelete` |
 | `DELETE /projects/{slug}` | `ProjectDeleted` | `projectDelete` |
+| `GET /dashboard` | `DashboardSummary` | `dashboard` |
 | `GET /files` | `FileMetadata[]` | `files` |
 | `GET /files-by-key/detail` | `FileMetadataDetail` | `fileByKeyDetail` |
 | `GET /files-by-key/download` | `FileUrlResponse` | `fileByKeyDownload` |
@@ -208,10 +209,12 @@ still in step.
 | `GET /health` | `HealthStatus` | `health` |
 | `GET /metrics` | — | _server-only_ |
 | `GET /models` | `ModelInfo` | `models` |
+| `GET /project-creates` | `ProjectCreating[]` | `projectCreates` |
 | `GET /projects` | `LabelingProject[]` | `projects` |
 | `GET /projects/{slug}` | `ProjectDetail` | `project` |
 | `GET /projects/{slug}/assets` | `AssetPage` | `assets` |
 | `GET /projects/{slug}/prelabel-runs` | `PrelabelRun[]` | `prelabelRuns` |
+| `GET /projects/{slug}/progress` | `ProjectProgress` | `projectProgress` |
 | `GET /projects/{slug}/releases` | `DatasetRelease[]` | `releases` |
 | `GET /projects/{slug}/releases/{release}` | `DatasetRelease` | `release` |
 | `GET /projects/{slug}/verification` | `VerificationReport` | `verification` |

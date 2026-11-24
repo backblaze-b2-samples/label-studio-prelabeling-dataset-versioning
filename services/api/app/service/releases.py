@@ -12,7 +12,7 @@ import logging
 from collections import Counter
 from datetime import UTC, datetime
 
-from app.repo import b2_objects
+from app.repo import b2_objects, progress
 from app.service import coco, keys, verification
 from app.service.deps import label_studio, upstream
 from app.service.errors import ConflictError, InvalidRequestError, NotFoundError
@@ -92,17 +92,42 @@ def export_box_counts(export: list[dict]) -> dict[int, int]:
     return counts
 
 
+RELEASE_STEPS = (
+    *verification.GATHER_STEPS,
+    "Fetching Label Studio's export",
+    "Building COCO and cross-checking the export",
+    "Writing coco.json and the export to B2",
+    "Writing manifest.json, which commits the release",
+)
+
+
 def cut_release(slug: str, request: ReleaseCreate) -> DatasetRelease:
+    """One cut per project at a time; each step is reported to `repo.progress`."""
     name = _valid_name(request.name) if request.name else _default_name(slug)
     with upstream():
         if b2_objects.head(_manifest_key(slug, name)) is not None:
             raise ConflictError(f"Release '{name}' already exists and is immutable")
-    state = verification.gather(slug)
+    if not progress.start(progress.RELEASE, slug, "Loading the project", len(RELEASE_STEPS)):
+        raise ConflictError("A release is already being cut for this project.")
+    try:
+        return _cut(slug, name, request)
+    finally:
+        progress.finish(progress.RELEASE, slug)
+
+
+def _step(slug: str, stage: str) -> None:
+    """Mark `stage` as running: `done` counts the steps before it."""
+    progress.update(progress.RELEASE, slug, stage=stage, done=RELEASE_STEPS.index(stage))
+
+
+def _cut(slug: str, name: str, request: ReleaseCreate) -> DatasetRelease:
+    state = verification.gather(slug, lambda stage: _step(slug, stage))
     report = verification.report(slug, state)
     if report.status != "complete":
         raise ConflictError("Verification is incomplete; resolve the flagged tasks first", report.flagged)
 
     descriptor, records, latest = state["descriptor"], state["records"], state["annotations"]
+    _step(slug, RELEASE_STEPS[4])
     with upstream():
         ls = label_studio()
         export = ls.export_json(descriptor.label_studio_project_id)
@@ -134,6 +159,7 @@ def cut_release(slug: str, request: ReleaseCreate) -> DatasetRelease:
                 **changes,
             )
         )
+    _step(slug, RELEASE_STEPS[5])
     try:
         dataset = coco.build_coco(descriptor.labels, images, f"{descriptor.title} {name}")
     except ValueError as e:
@@ -142,6 +168,7 @@ def cut_release(slug: str, request: ReleaseCreate) -> DatasetRelease:
 
     created = datetime.now(UTC)
     files: list[ManifestFileRow] = []
+    _step(slug, RELEASE_STEPS[6])
     with upstream():
         for filename, payload in ((keys.COCO_FILE, dataset), (keys.LS_EXPORT_FILE, export)):
             key = keys.release_file_key(slug, name, filename)
@@ -165,6 +192,7 @@ def cut_release(slug: str, request: ReleaseCreate) -> DatasetRelease:
                 images=len(dataset["images"]), annotations=len(dataset["annotations"]), **totals
             ),
         )
+        _step(slug, RELEASE_STEPS[7])
         b2_objects.put_json(_manifest_key(slug, name), manifest.model_dump(mode="json"))
     logger.info("Release %s/%s: %d images, %d boxes", slug, name, len(rows), len(dataset["annotations"]))
     return _summary(manifest, True)

@@ -79,6 +79,49 @@ class ProjectDetail(ResponseModel):
     latest_release: DatasetRelease | None
 
 
+class JobProgress(ResponseModel):
+    """One long-running job's position, as last reported by the job itself."""
+
+    stage: str = Field(description="What the job is doing now, in a few words.")
+    done: int = Field(description="Units finished so far (images copied, tasks scored).")
+    total: int = Field(description="Units the job will process; 0 while still unknown.")
+    subject: str | None = Field(
+        default=None, description="What the job is for when the slug alone does not say (a new project's title)."
+    )
+    started_at: datetime
+
+
+class ProjectProgress(ResponseModel):
+    """Jobs running for one project right now; null when that job is idle.
+
+    In-process state of this API worker: it survives a browser reload but not
+    an API restart.
+    """
+
+    seeding: JobProgress | None = Field(description="Sample images being copied during create.")
+    prelabel: JobProgress | None = Field(description="A pre-label run in flight.")
+    release: JobProgress | None = Field(description="A release being cut; `done`/`total` count its steps.")
+
+
+class ProjectCreating(ResponseModel):
+    """A create still in flight (no descriptor on B2 yet), so /projects can show it after a reload."""
+
+    slug: str
+    title: str
+    progress: JobProgress = Field(description="Seeding progress while images copy, else the create step.")
+
+
+class DashboardSummary(ResponseModel):
+    """Totals across every project plus the newest releases, in one call."""
+
+    projects: int
+    tasks: int
+    annotated_tasks: int
+    releases: int
+    unreadable: list[str] = Field(description="Slugs whose counts could not be read (e.g. Label Studio down).")
+    recent_releases: list[DatasetRelease] = Field(description="Newest first, at most 10.")
+
+
 class ProjectDeleted(ResponseModel):
     slug: str
     label_studio_project_deleted: bool

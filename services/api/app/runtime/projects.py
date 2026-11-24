@@ -6,16 +6,19 @@ ML backend or B2, and Starlette runs sync handlers in its threadpool.
 
 from fastapi import APIRouter
 
-from app.service import annotations, prelabels, projects, verification
+from app.service import annotations, dashboard, prelabels, projects, verification
 from app.types import (
     AnnotationSyncResult,
+    DashboardSummary,
     LabelingProject,
     ModelInfo,
     PrelabelRun,
     PrelabelRunCreate,
     ProjectCreate,
+    ProjectCreating,
     ProjectDeleted,
     ProjectDetail,
+    ProjectProgress,
     ProjectUpdate,
     ReleaseBlocked,
     SyncResult,
@@ -36,6 +39,18 @@ def list_projects():
     return projects.list_projects()
 
 
+@router.get("/project-creates", response_model=list[ProjectCreating])
+def list_project_creates():
+    """Creates still running (no descriptor yet), so /projects shows them after a reload."""
+    return projects.list_creating()
+
+
+@router.get("/dashboard", response_model=DashboardSummary)
+def get_dashboard():
+    """Totals across every project and the newest releases, in one call."""
+    return dashboard.summary()
+
+
 @router.post("/projects", response_model=LabelingProject, status_code=201, responses=_CONFLICT)
 def create_project(req: ProjectCreate):
     return projects.create_project(req)
@@ -44,6 +59,12 @@ def create_project(req: ProjectCreate):
 @router.get("/projects/{slug}", response_model=ProjectDetail)
 def get_project(slug: str):
     return projects.get_detail(slug)
+
+
+@router.get("/projects/{slug}/progress", response_model=ProjectProgress)
+def get_project_progress(slug: str):
+    """Seeding / pre-label progress, polled by the web app while a job runs."""
+    return projects.get_progress(slug)
 
 
 @router.patch("/projects/{slug}", response_model=LabelingProject)
