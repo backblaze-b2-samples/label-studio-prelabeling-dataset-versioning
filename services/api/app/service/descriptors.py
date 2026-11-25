@@ -13,10 +13,11 @@ from app.repo import b2_objects
 from app.service import keys
 from app.service.deps import upstream
 from app.service.errors import InvalidRequestError, NotFoundError
+from app.service.parallel import parallel_map
 from app.types import LabelingProject, ProjectDescriptor
 
 
-def _valid_slug(slug: str) -> str:
+def valid_slug(slug: str) -> str:
     try:
         return keys.validate_project_slug(slug)
     except keys.KeyLayoutError as e:
@@ -24,7 +25,7 @@ def _valid_slug(slug: str) -> str:
 
 
 def load(slug: str) -> ProjectDescriptor:
-    _valid_slug(slug)
+    valid_slug(slug)
     with upstream():
         data = b2_objects.get_json(keys.descriptor_key(slug))
     if data is None:
@@ -46,7 +47,8 @@ def save(descriptor: ProjectDescriptor) -> None:
 def list_all() -> list[ProjectDescriptor]:
     with upstream():
         objects = b2_objects.list_prefix(keys.projects_prefix())
-        found = [b2_objects.get_json(obj["key"]) for obj in objects if obj["key"].endswith(".json")]
+        # One GET per descriptor: overlapped, or N projects cost N round trips.
+        found = parallel_map(b2_objects.get_json, [o["key"] for o in objects if o["key"].endswith(".json")])
     descriptors = [ProjectDescriptor.model_validate(d) for d in found if d]
     return sorted(descriptors, key=lambda d: d.created_at, reverse=True)
 

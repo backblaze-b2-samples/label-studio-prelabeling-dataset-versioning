@@ -1,7 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it } from "vitest";
-import { dropDeletedFileFromCache, projectKeys, qk } from "@/lib/queries";
-import type { FileMetadata } from "@label-studio-prelabeling-dataset-versioning/shared";
+import { addRunToCache, dropDeletedFileFromCache, projectKeys, qk } from "@/lib/queries";
+import type {
+  FileMetadata,
+  PrelabelRun,
+  ProjectDetail,
+} from "@label-studio-prelabeling-dataset-versioning/shared";
 
 function file(key: string): FileMetadata {
   return {
@@ -106,5 +110,32 @@ describe("projectKeys", () => {
     qc.setQueryData(projectKeys.detail("a"), { ok: true });
     await qc.invalidateQueries({ queryKey: qk.projects() });
     expect(qc.getQueryState(projectKeys.detail("a"))?.isInvalidated).toBe(true);
+  });
+});
+
+describe("addRunToCache", () => {
+  const run = { run_id: "20261124T000000Z-rtdetr-r18", tasks: 8 } as PrelabelRun;
+
+  it("updates the Overview counts and latest run at once", () => {
+    const qc = new QueryClient();
+    const detail = {
+      counts: { raw_objects: 8, tasks: 8, annotated_tasks: 0, prelabel_runs: 0, releases: 0 },
+      latest_run: null,
+    } as unknown as ProjectDetail;
+    qc.setQueryData(projectKeys.detail("demo"), detail);
+    qc.setQueryData(projectKeys.runs("demo"), []);
+
+    addRunToCache(qc, "demo", run);
+
+    const updated = qc.getQueryData<ProjectDetail>(projectKeys.detail("demo"));
+    expect(updated?.counts.prelabel_runs).toBe(1);
+    expect(updated?.latest_run).toBe(run);
+    expect(qc.getQueryData(projectKeys.runs("demo"))).toEqual([run]);
+  });
+
+  it("leaves an uncached project alone", () => {
+    const qc = new QueryClient();
+    addRunToCache(qc, "demo", run);
+    expect(qc.getQueryData(projectKeys.detail("demo"))).toBeUndefined();
   });
 });

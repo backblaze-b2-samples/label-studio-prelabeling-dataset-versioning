@@ -13,7 +13,7 @@ and the release process. Two companion docs carry the reference material:
 - Agent docs health: `pnpm check:agent-docs`
 - Cold-start setup: `pnpm run setup` (also generates `LABEL_STUDIO_API_TOKEN` and `LABEL_STUDIO_PASSWORD` in `.env`)
 - Label Studio + ML backend: `docker compose up -d` (stop: `docker compose down`; reset Label Studio's data: `docker compose down -v`)
-- Bucket CORS for the web app and Label Studio: `services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply`
+- Bucket CORS for the web app and Label Studio: `services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --origin http://127.0.0.1:3000 --apply`
 - Seed CC0 images into a project: `services/api/.venv/bin/python services/api/scripts/seed_images.py --project <slug> [--limit N]`
 - Annotate from the latest run without a person (tests/demos): `services/api/.venv/bin/python services/api/scripts/annotate_from_prelabels.py --project <slug> [--skip-last | --only-last]`
 - ML backend unit tests: `pnpm test:ml`

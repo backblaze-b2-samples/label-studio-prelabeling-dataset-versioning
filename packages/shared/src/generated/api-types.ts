@@ -37,6 +37,18 @@ export interface AssetPage {
   project: string;
 }
 
+/** Totals across every project plus the newest releases, in one call. */
+export interface DashboardSummary {
+  annotated_tasks: number;
+  projects: number;
+  /** Newest first, at most 10. */
+  recent_releases: DatasetRelease[];
+  releases: number;
+  tasks: number;
+  /** Slugs whose counts could not be read (e.g. Label Studio down). */
+  unreadable: string[];
+}
+
 /** A committed release under `labeling/exports/<project>/<release>/`. */
 export interface DatasetRelease {
   annotations: number;
@@ -165,6 +177,22 @@ export interface HealthStatus {
    * "degraded".
    */
   status: string;
+}
+
+/** One long-running job's position, as last reported by the job itself. */
+export interface JobProgress {
+  /** Units finished so far (images copied, tasks scored). */
+  done: number;
+  /** What the job is doing now, in a few words. */
+  stage: string;
+  started_at: string;
+  /**
+   * What the job is for when the slug alone does not say (a new project's
+   * title).
+   */
+  subject: string | null;
+  /** Units the job will process; 0 while still unknown. */
+  total: number;
 }
 
 /** A Label Studio project bound to one raw-image prefix on B2. */
@@ -306,6 +334,17 @@ export interface ProjectCreate {
   title: string;
 }
 
+/**
+ * A create still in flight (no descriptor on B2 yet), so /projects can
+ * show it after a reload.
+ */
+export interface ProjectCreating {
+  /** Seeding progress while images copy, else the create step. */
+  progress: JobProgress;
+  slug: string;
+  title: string;
+}
+
 export interface ProjectDeleted {
   /** Objects removed from B2 (0 unless purge_b2=true). */
   b2_objects_deleted: number;
@@ -318,6 +357,20 @@ export interface ProjectDetail {
   latest_release: DatasetRelease | null;
   latest_run: PrelabelRun | null;
   project: LabelingProject;
+}
+
+/**
+ * Jobs running for one project right now; null when that job is idle.
+ * In-process state of this API worker: it survives a browser reload but
+ * not an API restart.
+ */
+export interface ProjectProgress {
+  /** A pre-label run in flight. */
+  prelabel: JobProgress | null;
+  /** A release being cut; `done`/`total` count its steps. */
+  release: JobProgress | null;
+  /** Sample images being copied during create. */
+  seeding: JobProgress | null;
 }
 
 /** Labels are deliberately absent: they are fixed after creation. */

@@ -142,6 +142,53 @@
         "title": "AssetPage",
         "type": "object"
       },
+      "DashboardSummary": {
+        "description": "Totals across every project plus the newest releases, in one call.",
+        "properties": {
+          "annotated_tasks": {
+            "title": "Annotated Tasks",
+            "type": "integer"
+          },
+          "projects": {
+            "title": "Projects",
+            "type": "integer"
+          },
+          "recent_releases": {
+            "description": "Newest first, at most 10.",
+            "items": {
+              "$ref": "#/components/schemas/DatasetRelease"
+            },
+            "title": "Recent Releases",
+            "type": "array"
+          },
+          "releases": {
+            "title": "Releases",
+            "type": "integer"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "unreadable": {
+            "description": "Slugs whose counts could not be read (e.g. Label Studio down).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Unreadable",
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects",
+          "tasks",
+          "annotated_tasks",
+          "releases",
+          "unreadable",
+          "recent_releases"
+        ],
+        "title": "DashboardSummary",
+        "type": "object"
+      },
       "DatasetRelease": {
         "description": "A committed release under `labeling/exports/<project>/<release>/`.",
         "properties": {
@@ -648,6 +695,52 @@
           "ml_backend"
         ],
         "title": "HealthStatus",
+        "type": "object"
+      },
+      "JobProgress": {
+        "description": "One long-running job's position, as last reported by the job itself.",
+        "properties": {
+          "done": {
+            "description": "Units finished so far (images copied, tasks scored).",
+            "title": "Done",
+            "type": "integer"
+          },
+          "stage": {
+            "description": "What the job is doing now, in a few words.",
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the job is for when the slug alone does not say (a new project's title).",
+            "title": "Subject"
+          },
+          "total": {
+            "description": "Units the job will process; 0 while still unknown.",
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "done",
+          "total",
+          "subject",
+          "started_at"
+        ],
+        "title": "JobProgress",
         "type": "object"
       },
       "LabelingProject": {
@@ -1160,6 +1253,30 @@
         "title": "ProjectCreate",
         "type": "object"
       },
+      "ProjectCreating": {
+        "description": "A create still in flight (no descriptor on B2 yet), so /projects can show it after a reload.",
+        "properties": {
+          "progress": {
+            "$ref": "#/components/schemas/JobProgress",
+            "description": "Seeding progress while images copy, else the create step."
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "progress"
+        ],
+        "title": "ProjectCreating",
+        "type": "object"
+      },
       "ProjectDeleted": {
         "properties": {
           "b2_objects_deleted": {
@@ -1220,6 +1337,51 @@
           "latest_release"
         ],
         "title": "ProjectDetail",
+        "type": "object"
+      },
+      "ProjectProgress": {
+        "description": "Jobs running for one project right now; null when that job is idle.\n\nIn-process state of this API worker: it survives a browser reload but not\nan API restart.",
+        "properties": {
+          "prelabel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pre-label run in flight."
+          },
+          "release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A release being cut; `done`/`total` count its steps."
+          },
+          "seeding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample images being copied during create."
+          }
+        },
+        "required": [
+          "seeding",
+          "prelabel",
+          "release"
+        ],
+        "title": "ProjectProgress",
         "type": "object"
       },
       "ProjectUpdate": {
@@ -1726,6 +1888,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/dashboard": {
+      "get": {
+        "description": "Totals across every project and the newest releases, in one call.",
+        "operationId": "get_dashboard_dashboard_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Dashboard",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/files": {
       "get": {
         "operationId": "list_files_endpoint_files_get",
@@ -2244,6 +2428,32 @@
         ]
       }
     },
+    "/project-creates": {
+      "get": {
+        "description": "Creates still running (no descriptor yet), so /projects shows them after a reload.",
+        "operationId": "list_project_creates_project_creates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectCreating"
+                  },
+                  "title": "Response List Project Creates Project Creates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Project Creates",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "list_projects_projects_get",
@@ -2719,6 +2929,49 @@
           }
         },
         "summary": "Create Prelabel Run",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/projects/{slug}/progress": {
+      "get": {
+        "description": "Seeding / pre-label progress, polled by the web app while a job runs.",
+        "operationId": "get_project_progress_projects__slug__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectProgress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Progress",
         "tags": [
           "projects"
         ]

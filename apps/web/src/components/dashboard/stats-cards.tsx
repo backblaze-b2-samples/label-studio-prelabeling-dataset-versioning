@@ -5,7 +5,7 @@ import { CheckSquare, ListTodo, PackageCheck, Tags } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectDetails, useProjects } from "@/lib/queries";
+import { useDashboard } from "@/lib/queries";
 
 /** Annotated share as a whole percent; "—" while there are no tasks. */
 export function annotatedPercent(annotated: number, tasks: number): string {
@@ -13,29 +13,24 @@ export function annotatedPercent(annotated: number, tasks: number): string {
 }
 
 export function StatsCards() {
-  const projects = useProjects();
-  const slugs = (projects.data ?? []).map((p) => p.slug);
-  const details = useProjectDetails(slugs);
+  const dashboard = useDashboard();
 
-  if (projects.error) {
+  if (dashboard.error) {
     return (
       <Card>
         <CardContent className="p-0">
-          <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
+          <ErrorState error={dashboard.error} onRetry={() => dashboard.refetch()} />
         </CardContent>
       </Card>
     );
   }
 
-  const loading = projects.isLoading || details.some((d) => d.isLoading);
-  const counts = details.flatMap((d) => (d.data ? [d.data.counts] : []));
-  const tasks = counts.reduce((sum, c) => sum + c.tasks, 0);
-  const annotated = counts.reduce((sum, c) => sum + c.annotated_tasks, 0);
-  const releases = counts.reduce((sum, c) => sum + c.releases, 0);
-  const failed = details.filter((d) => d.error).length;
+  const loading = dashboard.isLoading;
+  const { projects = 0, tasks = 0, annotated_tasks: annotated = 0, releases = 0 } = dashboard.data ?? {};
+  const failed = dashboard.data?.unreadable.length ?? 0;
 
   const cards = [
-    { title: "Projects", value: slugs.length, icon: Tags, hint: null },
+    { title: "Projects", value: projects, icon: Tags, hint: null },
     { title: "Tasks", value: tasks, icon: ListTodo, hint: null },
     { title: "Annotated tasks", value: annotated, icon: CheckSquare, hint: annotatedPercent(annotated, tasks) },
     { title: "Releases", value: releases, icon: PackageCheck, hint: null },

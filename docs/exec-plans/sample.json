@@ -52,5 +52,26 @@
   ],
   "attribution_token": "b2ai-label-studio-annotation-loop",
   "repo": { "org": "backblaze-b2-samples", "name": "label-studio-prelabeling-dataset-versioning" },
-  "screenshots": []
+  "screenshots": [
+    {
+      "path": "docs/images/dashboard.png",
+      "alt": "Dashboard showing projects, annotation progress and recent dataset releases",
+      "caption": "**Dashboard** \u2014 track projects, annotation progress and recent dataset releases stored on Backblaze B2."
+    },
+    {
+      "path": "docs/images/project-overview.png",
+      "alt": "Labeling project with eight annotated tasks and a completed release",
+      "caption": "**Project workflow** \u2014 sync images, run local pre-labels, correct annotations and cut a versioned release."
+    },
+    {
+      "path": "docs/images/dataset-releases.png",
+      "alt": "COCO dataset release with eight images and 59 corrected bounding boxes",
+      "caption": "**Dataset releases** \u2014 inspect immutable COCO releases and re-verify their images, annotations and manifests."
+    },
+    {
+      "path": "docs/images/dataset-library.png",
+      "alt": "Dataset library listing source images and their annotation status",
+      "caption": "**Dataset library** \u2014 browse raw images, model suggestions, annotations and release files for each project."
+    }
+  ]
 }

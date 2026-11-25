@@ -22,7 +22,9 @@ Run Label Studio Community Edition and the sample's ML backend locally with one 
 ## Storage wiring
 - Source: `POST /api/storages/s3/` — prefix `labeling/raw/<slug>`, `regex_filter=(?i)^.*\.(jpe?g|png|webp)$`, `use_blob_urls`, `presign` (15 min), `recursive_scan`, `region_name=B2_REGION`, `s3_endpoint=https://s3.<B2_REGION>.backblazeb2.com`
 - Target: `POST /api/storages/export/s3` — prefix `labeling/annotations/<slug>`. 1.23.2 writes one object per annotation at `<prefix>/<annotation id>` (no extension, no doubled `/` because the prefix is sent without a trailing slash); the body is the annotation with its task nested
-- Images load in the labeling UI from presigned B2 URLs, so the bucket CORS must allow the Label Studio origin for GET/HEAD (`setup_b2_cors.py` adds that rule)
+- Images load in the labeling UI from presigned B2 URLs (`/tasks/<id>/resolve/` answers 303 to B2), so the bucket CORS must allow the Label Studio origin for GET/HEAD (`setup_b2_cors.py` adds that rule). Without it the labeling view shows "There was an issue loading URL from $image value"
+- Task data via the API: `GET /api/tasks/` rewrites `s3://` URIs to `/tasks/<id>/resolve/?fileuri=<base64>` unless `resolve_uri=false`; this sample's API always passes `resolve_uri=false`
+- `GET /api/version/` on the `1.23.2` image reports `release: 1.23.0` (upstream package metadata); the build commit is the 1.23.2 one, so `/health` showing 1.23.0 is expected
 
 ## ML backend (`services/ml-backend/`)
 - FastAPI, no `label-studio-ml` SDK: `GET /health`, `POST /setup`, `POST /predict`, plus `GET /info`
@@ -35,6 +37,7 @@ Run Label Studio Community Edition and the sample's ML backend locally with one 
 
 ## Verification
 - `pnpm run doctor` warns when either service is not answering
+- `services/api/tests/test_setup_b2_cors.py`: a bucket with no CORS yet (B2 answers `NoSuchCorsConfiguration`, AWS `NoSuchCORSConfiguration`) reads as zero rules instead of crashing the setup step
 - `pnpm test:live:loop` drives both for real
 
 ## Related Docs

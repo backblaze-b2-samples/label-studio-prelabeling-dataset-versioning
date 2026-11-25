@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Tags } from "lucide-react";
 
@@ -9,14 +10,41 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useProjects } from "@/lib/queries";
+import { creatingRowView } from "@/lib/project-create-progress";
+import { useInvalidateProjects, useProjectCreates, useProjects } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
+import { JobProgressLine } from "./job-progress-line";
+
+/**
+ * Creates still running on the API. The create dialog's own progress dies
+ * with a reload; this keeps the create visible (so nobody starts it twice) and
+ * refreshes the list when it lands.
+ */
+function CreatesInFlight({ known }: { known: Set<string> }) {
+  const creates = (useProjectCreates().data ?? []).filter((c) => !known.has(c.slug));
+  const invalidate = useInvalidateProjects();
+  const count = useRef(0);
+  useEffect(() => {
+    if (creates.length < count.current) invalidate();
+    count.current = creates.length;
+  }, [creates.length, invalidate]);
+
+  if (creates.length === 0) return null;
+  return (
+    <div className="space-y-3 border-b border-border p-4">
+      {creates.map((c) => (
+        <JobProgressLine key={c.slug} label={`Creating ${c.title}`} view={creatingRowView(c)} />
+      ))}
+    </div>
+  );
+}
 
 export function ProjectList() {
   const { data: projects = [], isLoading, error, refetch } = useProjects();
 
   return (
     <Card>
+      <CreatesInFlight known={new Set(projects.map((p) => p.slug))} />
       <CardContent className="p-0">
         {isLoading ? (
           <div className="space-y-3 p-4">

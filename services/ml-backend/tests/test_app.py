@@ -1,5 +1,6 @@
 """HTTP protocol tests with a stub detector and a stubbed B2 read (no torch, no network)."""
 
+import base64
 import io
 import os
 
@@ -112,6 +113,12 @@ def test_parse_s3_uri_rejects_other_bucket():
     with pytest.raises(ValueError):
         b2.parse_s3_uri("s3://other-bucket/key.jpg")
     assert b2.parse_s3_uri("s3://test-bucket/a/b.jpg") == ("test-bucket", "a/b.jpg")
+
+
+def test_parse_s3_uri_decodes_label_studio_resolve_url():
+    encoded = base64.urlsafe_b64encode(b"s3://test-bucket/labeling/raw/p/a.jpg").decode()
+    url = f"/tasks/7/resolve/?fileuri={encoded}"
+    assert b2.parse_s3_uri(url) == ("test-bucket", "labeling/raw/p/a.jpg")
 
 
 def test_s3_client_carries_attribution_user_agent(monkeypatch):

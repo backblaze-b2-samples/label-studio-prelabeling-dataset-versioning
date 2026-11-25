@@ -59,6 +59,19 @@ def test_list_tasks_paginates():
     assert len(_ls(handler).list_tasks(1)) == 150
 
 
+def test_list_tasks_keeps_raw_s3_uris():
+    """Label Studio rewrites s3:// to /tasks/<id>/resolve/?fileuri=... unless told not to;
+    the pre-label run, verifier and key layout all need the raw s3:// URI."""
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.params.get("resolve_uri"))
+        return httpx.Response(200, json={"tasks": [], "total": 0})
+
+    _ls(handler).list_tasks(1)
+    assert seen == ["false"]
+
+
 def test_sync_polls_until_completed():
     statuses = iter(["in_progress", "completed"])
 

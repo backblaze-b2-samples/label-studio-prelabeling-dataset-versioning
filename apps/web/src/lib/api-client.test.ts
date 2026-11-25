@@ -7,6 +7,7 @@ import {
   getFile,
   getFileDetail,
   getPreviewUrl,
+  storageNetworkError,
   uploadFile,
 } from "./api-client";
 
@@ -265,6 +266,7 @@ describe("uploadFile — direct-to-B2 PUT failure", () => {
     expect((error as ApiError).status).toBe(0);
     expect((error as ApiError).message).toMatch(/bucket's CORS/);
     expect((error as ApiError).message).not.toMatch(/API logs/);
+    expect((error as ApiError).message).not.toMatch(/If this app is deployed/);
 
     // The presign succeeded; verify must never run after a failed PUT.
     expect(
@@ -272,5 +274,13 @@ describe("uploadFile — direct-to-B2 PUT failure", () => {
         String(input).includes("/upload/verify")
       )
     ).toBe(false);
+  });
+
+  it("names the exact setup command for the page's origin", () => {
+    const { message } = storageNetworkError("http://localhost:3000");
+    expect(message).toContain(
+      "services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply"
+    );
+    expect(message).not.toMatch(/your origin/);
   });
 });

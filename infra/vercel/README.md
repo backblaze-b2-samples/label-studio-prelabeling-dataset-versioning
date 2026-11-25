@@ -144,12 +144,10 @@ Alongside `repository-url` and the `env` list, the button carries the
 presentation parameters the clone flow renders in its preview card:
 `project-name` and `repository-name` (both `label-studio-prelabeling-dataset-versioning`, so the cloned repo and
 the created Project get a readable default name), plus
-`demo-title`, `demo-description`.
+`demo-title`, `demo-description`, `demo-image`.
 
-There is no `demo-image`: this repository ships no screenshots yet, and a
-button parameter pointing at a file that does not exist renders a broken
-card. Add entries to `docs/exec-plans/sample.json` `screenshots` and re-run
-`pnpm gen:docs` to include one.
+`demo-image` points at `docs/images/dashboard.png`, resolved against this
+repository's default branch.
 
 There is no `demo-url`: this repository hosts no public demo deployment, and
 the API is unauthenticated and bucket-wide (see

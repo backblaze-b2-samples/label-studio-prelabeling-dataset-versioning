@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileMetadataPanel } from "@/components/files/file-metadata-panel";
-import { PreviewMedia } from "@/components/files/file-preview-media";
+import { PreviewLoading, PreviewMedia, PreviewText } from "@/components/files/file-preview-media";
+import { isTextPreviewable } from "@/lib/text-preview";
 import { useFileDetail, usePreviewUrl } from "@/lib/queries";
 import type { FileMetadata } from "@label-studio-prelabeling-dataset-versioning/shared";
 
@@ -110,6 +111,7 @@ export function FilePreview({
 
   const isImage = file.content_type.startsWith("image/");
   const isPdf = file.content_type === "application/pdf";
+  const isText = isTextPreviewable(file.content_type);
   const isDownloading = downloadingKey === file.key;
   const previewError =
     isError && error instanceof Error
@@ -127,15 +129,17 @@ export function FilePreview({
         <div className="grid min-w-0 gap-4 md:grid-cols-2">
           <div className="flex min-w-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 min-h-[220px]">
             {isLoading ? (
-              <div
-                className="w-full p-3"
-                role="status"
-                aria-live="polite"
-                aria-label="Loading file preview"
-              >
-                <p className="sr-only">Loading file preview...</p>
-                <Skeleton className="h-[min(55svh,400px)] min-h-[220px] w-full" />
+              <div className="relative h-[min(55svh,400px)] min-h-[220px] w-full">
+                <PreviewLoading />
               </div>
+            ) : isText && previewUrl ? (
+              <PreviewText
+                key={previewUrl}
+                fileKey={file.key}
+                url={previewUrl}
+                contentType={file.content_type}
+                sizeBytes={file.size_bytes}
+              />
             ) : (isImage || isPdf) && previewUrl ? (
               // Keyed on the URL so switching files resets the media state.
               <PreviewMedia

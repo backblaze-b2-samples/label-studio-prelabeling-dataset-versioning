@@ -8,6 +8,10 @@ import type { NextConfig } from "next";
 // without per-deployment tweaks.
 const nextConfig: NextConfig = {
   transpilePackages: ["@label-studio-prelabeling-dataset-versioning/shared"],
+  // Playwright drives http://127.0.0.1:3000 (see playwright.config.ts). Next dev
+  // blocks /_next dev resources for any host but localhost unless listed here,
+  // and the page then never hydrates. Dev-server only; no effect on builds.
+  allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns: [
       {

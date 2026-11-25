@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { History, PackageOpen } from "lucide-react";
+import { History, Loader2, PackageOpen, X } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { prelabelFailureHint } from "@/lib/project-next-step";
 import { usePrelabelRuns, useProject, useReleases, useVerification } from "@/lib/queries";
 import { ProjectActions } from "./project-actions";
 import { ProjectDeleteZone } from "./project-delete-zone";
@@ -20,6 +23,7 @@ import { VerificationPanel } from "./verification-panel";
 
 export function ProjectDetailView({ slug }: { slug: string }) {
   const [tab, setTab] = useState("overview");
+  const [prelabelFailure, setPrelabelFailure] = useState<string | null>(null);
   const detail = useProject(slug);
   const runs = usePrelabelRuns(slug);
   const releases = useReleases(slug);
@@ -50,12 +54,35 @@ export function ProjectDetailView({ slug }: { slug: string }) {
 
       <ProjectActions
         project={project}
-        releaseCount={counts.releases}
+        counts={counts}
+        latestRelease={latest_release}
+        latestRunId={latest_run?.run_id ?? null}
         onVerify={() => {
           setTab("verification");
           void verification.refetch();
         }}
+        verifying={verification.isFetching}
+        onPrelabelFailure={setPrelabelFailure}
       />
+
+      {prelabelFailure && (
+        <Alert variant="destructive" role="alert" className="relative pr-10">
+          <AlertTitle>The last pre-label run failed</AlertTitle>
+          <AlertDescription>
+            <p>{prelabelFailureHint(prelabelFailure)}</p>
+            <p className="mt-1 break-all font-mono text-xs opacity-80">{prelabelFailure}</p>
+          </AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-1.5 top-1.5 h-7 w-7"
+            aria-label="Dismiss"
+            onClick={() => setPrelabelFailure(null)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </Alert>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -96,7 +123,15 @@ export function ProjectDetailView({ slug }: { slug: string }) {
                 ))}
               </div>
               <p className="pt-2 text-muted-foreground">
-                Latest run: {latest_run ? <code className="font-mono">{latest_run.run_id}</code> : "none yet"} ·
+                Latest run:{" "}
+                {latest_run ? (
+                  <code className="font-mono">{latest_run.run_id}</code>
+                ) : prelabelFailure ? (
+                  "last attempt failed (see above)"
+                ) : (
+                  "none yet"
+                )}{" "}
+                ·
                 Latest release: {latest_release ? <code className="font-mono">{latest_release.release}</code> : "none yet"} ·{" "}
                 <Link className="underline underline-offset-4" href={`/library?project=${encodeURIComponent(slug)}`}>
                   Browse in the Library
@@ -111,7 +146,11 @@ export function ProjectDetailView({ slug }: { slug: string }) {
           {runs.error ? (
             <ErrorState error={runs.error} onRetry={() => runs.refetch()} />
           ) : (runs.data ?? []).length === 0 ? (
-            <EmptyState icon={History} title="No pre-label runs yet" description="Sync from B2, then Run pre-labels." />
+            <EmptyState
+              icon={History}
+              title={prelabelFailure ? "The last pre-label run failed" : "No pre-label runs yet"}
+              description={prelabelFailure ? prelabelFailureHint(prelabelFailure) : "Sync from B2, then Run pre-labels."}
+            />
           ) : (
             <RunsTable slug={slug} runs={runs.data ?? []} />
           )}
@@ -133,8 +172,9 @@ export function ProjectDetailView({ slug }: { slug: string }) {
 
         <TabsContent value="verification" className="pt-4">
           {verification.isFetching ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Comparing raw images, tasks, pre-labels and annotations…
+            <p role="status" aria-busy="true" className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden="true" />
+              Comparing raw images, tasks, pre-labels and annotations on B2 and in Label Studio…
             </p>
           ) : verification.error ? (
             <ErrorState error={verification.error} onRetry={() => verification.refetch()} />

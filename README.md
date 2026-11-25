@@ -27,7 +27,23 @@ app's own features instead of rebuilding the same shell. Storage is
 <!-- gen:end readme-header -->
 
 <!-- gen:begin readme-screenshots -->
+## What it looks like
 
+**Dashboard** — track projects, annotation progress and recent dataset releases stored on Backblaze B2.
+
+![Dashboard showing projects, annotation progress and recent dataset releases](docs/images/dashboard.png)
+
+**Project workflow** — sync images, run local pre-labels, correct annotations and cut a versioned release.
+
+![Labeling project with eight annotated tasks and a completed release](docs/images/project-overview.png)
+
+**Dataset releases** — inspect immutable COCO releases and re-verify their images, annotations and manifests.
+
+![COCO dataset release with eight images and 59 corrected bounding boxes](docs/images/dataset-releases.png)
+
+**Dataset library** — browse raw images, model suggestions, annotations and release files for each project.
+
+![Dataset library listing source images and their annotation status](docs/images/dataset-library.png)
 <!-- gen:end readme-screenshots -->
 
 **The problem.** Annotators label every image from scratch, and raw data, model
@@ -80,7 +96,7 @@ pnpm run setup      # .env from .env.example, generates the Label Studio token +
    the web app; the labeling UI loads each image from a presigned B2 URL):
 
    ```bash
-   services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --apply
+   services/api/.venv/bin/python services/api/scripts/setup_b2_cors.py --origin http://localhost:3000 --origin http://127.0.0.1:3000 --apply
    ```
 
    It merges two rules into the bucket's CORS: the web origin (GET/PUT/HEAD) and
